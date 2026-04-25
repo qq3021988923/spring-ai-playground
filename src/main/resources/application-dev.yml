@@ -1,0 +1,35 @@
+server:
+  port: 8090
+
+spring:
+  application:
+    name: springai-lianxi
+  ai:
+    dashscope:
+      # ====== 这里需要填入你自己的阿里云 API Key ======
+      # 获取地址：https://bailian.console.aliyun.com/
+      api-key: xxx
+      chat:
+        options:
+          # 使用 qwen-plus 模型
+          model: xxx
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+  api-docs:
+    path: /v3/api-docs
+  group-configs:
+    - group: 'default'
+      paths-to-match: '/**'
+      packages-to-scan: com.yang.controller
+
+knife4j:
+  enable: true
+  setting:
+    language: zh_cn
+
+# 日志配置，方便看 Spring AI 的调用细节
+logging:
+  level:
+    org.springframework.ai: DEBUG
