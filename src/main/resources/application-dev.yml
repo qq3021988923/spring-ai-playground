@@ -8,11 +8,11 @@ spring:
     dashscope:
       # ====== 这里需要填入你自己的阿里云 API Key ======
       # 获取地址：https://bailian.console.aliyun.com/
-      api-key: xxxx
+      api-key: sk-8f196f4a6a394c248c15808a619a85ee
       chat:
         options:
           # 使用 qwen-plus 模型
-          model: xxxx
+          model: qwen-plus
 
 springdoc:
   swagger-ui:
