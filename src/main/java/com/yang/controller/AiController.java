@@ -1,5 +1,7 @@
 package com.yang.controller;
 
+import com.yang.model.LoveAdvice;
+import com.yang.service.AiService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.annotation.Resource;
@@ -30,12 +32,16 @@ public class AiController {
     @Resource
     private ChatModel chatModel;
 
+    // ====== 注入 AiService ======
+    @Resource
+    private AiService aiService;
+
     /**
      * 最简单的调用：一问一答 直接使用这个就可以了
      * 访问地址：http://localhost:8090/ai/chat?message=你好
      */
     @GetMapping("/chat")
-    @Operation(summary = "简单聊天", description = "输入一句话，AI 回复")
+    @Operation(summary = "简单聊天1", description = "输入一句话，AI 回复")
     public String chat(@RequestParam String message) {
         log.info("收到用户消息：{}", message);
 
@@ -55,7 +61,7 @@ public class AiController {
      * 访问地址：http://localhost:8090/ai/chat/multi
      */
     @PostMapping("/chat/multi")
-    @Operation(summary = "多轮对话", description = "支持上下文的对话")
+    @Operation(summary = "多轮对话1", description = "支持上下文的对话")
     public String multiChat(@RequestBody List<String> messages) {
         log.info("收到多轮对话消息：{}", messages);
 
@@ -84,5 +90,24 @@ public class AiController {
         log.info("AI 回复：{}", answer);
         return answer;
     }
+
+
+    @GetMapping("/love-advisor")
+    @Operation(summary = "恋爱顾问2", description = "让 AI 扮演恋爱顾问与你对话")
+    public String loveAdvisor(@RequestParam String message) {
+        return aiService.chatAsLoveAdvisor(message);
+    }
+
+    /**
+     * 获取结构化的恋爱建议
+     * 访问：http://localhost:8090/ai/love-advice?situation=我和对象吵架了
+     */
+    @GetMapping("/love-advice")
+    @Operation(summary = "获取恋爱建议2", description = "获取结构化的恋爱建议")
+    public LoveAdvice getLoveAdvice(@RequestParam String situation) {
+
+        return aiService.getLoveAdvice(situation);
+    }
+
 
 }
