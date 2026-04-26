@@ -3,16 +3,21 @@ package com.yang.service;
 import com.yang.model.LoveAdvice;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.ai.chat.messages.AssistantMessage;
 import org.springframework.ai.chat.messages.Message;
 import org.springframework.ai.chat.messages.SystemMessage;
 import org.springframework.ai.chat.messages.UserMessage;
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.chat.prompt.Prompt;
+import org.springframework.ai.chat.prompt.PromptTemplate;
 import org.springframework.ai.converter.BeanOutputConverter;
 import org.springframework.stereotype.Service;
 
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * AI 服务类
@@ -80,5 +85,85 @@ public class AiService {
             LoveAdvice loveAdvice = converter.convert(jsonResponse);
         return loveAdvice;
     }
+
+
+    // ====== 会话记忆：存储每个用户的对话历史 ======
+    // 注意：实际项目中应该用 Redis 或数据库存储，这里为了演示用 Map
+    private final Map<String, List<Message>> chatMemory = new ConcurrentHashMap<>();
+
+
+    /**
+     * 示例3：使用 Prompt Template（提示词模板） 比上面多个这个 PromptTemplate
+     * 比如：写一封邮件
+     * recipient：接收人
+     * tone：语气
+     * content：内容
+     */
+    public String writeEmail(String recipient, String tone, String content) {
+        // 定义提示词模板，使用 {变量名} 占位
+        String promptTemplate = """
+            请帮我写一封邮件。
+            
+            收件人：{recipient}
+            语气：{tone}
+            核心内容：{content}
+            
+            请直接写出邮件正文，不需要其他说明。
+            """;
+
+        // 创建 PromptTemplate 对象
+        PromptTemplate template = new PromptTemplate(promptTemplate);
+
+        // 填充变量
+        Prompt prompt = template.create(Map.of(
+                "recipient", recipient,
+                "tone", tone,
+                "content", content
+        ));
+
+        // 调用 AI
+        ChatResponse response = chatModel.call(prompt);
+        String email = response.getResult().getOutput().getText();
+        log.info("生成的邮件：{}", email);
+        return email;
+    }
+
+    /**
+     * 示例4：带记忆的对话（Chat Memory）
+     * 每个 userId 对应一个独立的对话历史
+     */
+    public String chatWithMemory(String userId, String userMessage) {
+        // 获取或初始化该用户的对话历史
+        List<Message> messages = chatMemory.computeIfAbsent(userId, k -> {
+            List<Message> init = new ArrayList<>();
+            // 添加系统提示词
+            init.add(new SystemMessage("你是一个 helpful 的 AI 助手。"));
+            return init;
+        });
+
+        // 添加当前用户消息
+        messages.add(new UserMessage(userMessage));
+
+        // 调用 AI
+        ChatResponse response = chatModel.call(new Prompt(messages));
+        String answer = response.getResult().getOutput().getText();
+
+        // 保存 AI 回复到历史记录
+        messages.add(new AssistantMessage(answer));
+        log.info("对话历史长度：{}", messages);
+        log.info("用户 {} 的对话历史长度：{}", userId, messages.size());
+        return answer;
+    }
+
+    /**
+     * 清空某个用户的对话记忆
+     */
+    public void clearMemory(String userId) {
+        chatMemory.remove(userId);
+        log.info("已清空用户 {} 的对话记忆", userId);
+    }
+
+
+
 
 }

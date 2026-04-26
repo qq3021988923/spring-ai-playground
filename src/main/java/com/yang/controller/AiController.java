@@ -110,4 +110,37 @@ public class AiController {
     }
 
 
+    @GetMapping("/write-email")
+    @Operation(summary = "写邮件3", description = "根据参数生成邮件")
+    public String writeEmail(
+            @RequestParam String recipient,
+            @RequestParam String tone,
+            @RequestParam String content) {
+        return aiService.writeEmail(recipient, tone, content);
+    }
+
+    /**
+     * 带记忆的对话
+     * 访问：http://localhost:8090/ai/chat/memory?userId=user001&message=我叫小明
+     * 然后再访问：http://localhost:8090/ai/chat/memory?userId=user001&message=我叫什么
+     */
+    @GetMapping("/chat/memory")
+    @Operation(summary = "带记忆的对话3", description = "每个 userId 有独立的对话历史")
+    public String chatWithMemory(
+            @RequestParam String userId,
+            @RequestParam String message) {
+        return aiService.chatWithMemory(userId, message);
+    }
+
+    /**
+     * 清空对话记忆
+     */
+    @PostMapping("/chat/memory/clear")
+    @Operation(summary = "清空记忆3", description = "清空某个用户的对话记忆")
+    public String clearMemory(@RequestParam String userId) {
+        aiService.clearMemory(userId);
+        return "已清空用户 " + userId + " 的对话记忆";
+    }
+
+
 }
