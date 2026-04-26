@@ -148,7 +148,7 @@ public class AiService {
         ChatResponse response = chatModel.call(new Prompt(messages));
         String answer = response.getResult().getOutput().getText();
 
-        // 保存 AI 回复到历史记录
+        // 保存 AI 回复到历史记录3
         messages.add(new AssistantMessage(answer));
         log.info("对话历史长度：{}", messages);
         log.info("用户 {} 的对话历史长度：{}", userId, messages.size());

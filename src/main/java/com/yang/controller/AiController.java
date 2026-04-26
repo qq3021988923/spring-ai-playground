@@ -120,7 +120,7 @@ public class AiController {
     }
 
     /**
-     * 带记忆的对话
+     * 带记忆的对话 33
      * 访问：http://localhost:8090/ai/chat/memory?userId=user001&message=我叫小明
      * 然后再访问：http://localhost:8090/ai/chat/memory?userId=user001&message=我叫什么
      */
