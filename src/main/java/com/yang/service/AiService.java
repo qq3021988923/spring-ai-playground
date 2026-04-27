@@ -1,8 +1,12 @@
 package com.yang.service;
 
 import com.yang.model.LoveAdvice;
+import com.yang.tools.MyTools;
+import jakarta.annotation.PostConstruct;
 import jakarta.annotation.Resource;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.messages.AssistantMessage;
 import org.springframework.ai.chat.messages.Message;
 import org.springframework.ai.chat.messages.SystemMessage;
@@ -12,6 +16,9 @@ import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.chat.prompt.Prompt;
 import org.springframework.ai.chat.prompt.PromptTemplate;
 import org.springframework.ai.converter.BeanOutputConverter;
+import org.springframework.ai.support.ToolCallbacks;
+import org.springframework.ai.tool.ToolCallback;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
@@ -25,10 +32,19 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 @Slf4j
 @Service
+@RequiredArgsConstructor
 public class AiService {
 
     @Resource
     private ChatModel chatModel;
+
+    // 在 AiService 顶部注入
+    @Resource
+    private ChatClient.Builder chatClientBuilder;
+
+    @Resource
+    private final ToolCallback[] toolCallbacks;   // 注入 ToolCallback 数组
+
 
     /**
      * 示例1：使用系统提示词，让 AI 扮演特定角色
@@ -164,6 +180,31 @@ public class AiService {
     }
 
 
+    // ====== 新增：带工具调用的对话 ======
+
+    /**
+     * 带工具调用的 AI 对话
+     * AI 可以根据需要自动调用我们注册的工具
+     */
 
 
+
+    /**
+     * 带工具调用的 AI 对话（使用 ChatClient）
+     */
+    public String chatWithTools(String userMessage) {
+        log.info("收到消息（带工具调用）：{}", userMessage);
+
+        String answer = chatClientBuilder
+                .build()                         // 每次构建新的 ChatClient
+                .prompt()
+                .toolCallbacks(toolCallbacks)    // ✅ 直接传入 ToolCallback 数组
+                .system("你是一个智能助手，可以使用提供的工具来回答问题。")
+                .user(userMessage)
+                .call()
+                .content();
+
+        log.info("AI 回复：{}", answer);
+        return answer;
+    }
 }
