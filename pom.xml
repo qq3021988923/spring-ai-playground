@@ -36,6 +36,21 @@
                 <type>pom</type>
                 <scope>import</scope>
             </dependency>
+
+            <!--
+       给 RAG 准备的两个基础工具，一个负责“读”，一个负责“切”
+       Spring AI 文档读取器 -->
+            <dependency>
+                <groupId>org.springframework.ai</groupId>
+                <artifactId>spring-ai-markdown-document-reader</artifactId>
+            </dependency>
+
+            <!-- Spring AI 文本分割器 -->
+            <dependency>
+                <groupId>org.springframework.ai</groupId>
+                <artifactId>spring-ai-core</artifactId>
+            </dependency>
+
         </dependencies>
     </dependencyManagement>
 
@@ -73,6 +88,8 @@
             <artifactId>spring-boot-starter-test</artifactId>
             <scope>test</scope>
         </dependency>
+
+
     </dependencies>
 
     <!-- 引入 Spring AI 相对稳定的测试版-->

@@ -2,6 +2,7 @@ package com.yang.controller;
 
 import com.yang.model.LoveAdvice;
 import com.yang.service.AiService;
+import com.yang.service.RagService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.annotation.Resource;
@@ -142,5 +143,26 @@ public class AiController {
         return "已清空用户 " + userId + " 的对话记忆";
     }
 
+    @Resource
+    private RagService ragService;
 
+    /**
+     * RAG 问答
+     * 访问：http://localhost:8090/ai/rag?query=产品A多少钱
+     * 有RAG的区别就是我原来有这个产品的资料，然后再把资料丢给ai优化再进行输出
+     */
+    @GetMapping("/rag")
+    @Operation(summary = "RAG 问答4", description = "基于知识库的智能问答")
+    public String ragChat(@RequestParam String query) {
+        return ragService.ragChat(query);
+    }
+
+    /**
+     * 查看知识库（调试用）
+     */
+    @GetMapping("/rag/knowledge")
+    @Operation(summary = "查看知识库4", description = "查看当前知识库内容")
+    public List<String> getKnowledgeBase() {
+        return ragService.getKnowledgeBase();
+    }
 }
