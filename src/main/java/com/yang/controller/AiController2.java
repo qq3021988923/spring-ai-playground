@@ -1,7 +1,9 @@
 package com.yang.controller;
 
 import com.yang.agent.ReActAgent;
+import com.yang.rag.LoveDocumentLoader;
 import com.yang.service.AiService;
+import com.yang.service.LoveAdvisorService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.annotation.Resource;
@@ -72,6 +74,32 @@ public class AiController2 {
         sb.append("<p>输出：").append(reActAgent.execute("123乘以456等于多少？")).append("</p>");
 
         return sb.toString();
+    }
+
+    @Resource
+    private LoveAdvisorService loveAdvisorService;
+
+    @Resource
+    private LoveDocumentLoader documentLoader;
+
+    /**
+     * 初始化恋爱知识库
+     */
+    @GetMapping("/love/init")
+    @Operation(summary = "初始化恋爱知识库7", description = "加载恋爱知识库到向量数据库")
+    public String initLoveKB() {
+        loveAdvisorService.init();
+        return "恋爱知识库初始化成功！";
+    }
+
+    /**
+     * 恋爱顾问 RAG 问答
+     * 访问：http://localhost:8090/ai/love/chat?question=不敢表白怎么办
+     */
+    @GetMapping("/love/chat")
+    @Operation(summary = "上下文存储数据库，恋爱顾问7", description = "基于 RAG 的恋爱顾问")
+    public String loveChat(@RequestParam String question) {
+        return loveAdvisorService.chat(question);
     }
 
 }

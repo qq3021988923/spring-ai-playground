@@ -51,6 +51,12 @@
                 <artifactId>spring-ai-core</artifactId>
             </dependency>
 
+            <!-- 向量存储（内存版，方便测试） -->
+            <dependency>
+                <groupId>org.springframework.ai</groupId>
+                <artifactId>spring-ai-store-in-memory</artifactId>
+            </dependency>
+
         </dependencies>
     </dependencyManagement>
 
@@ -89,6 +95,10 @@
             <scope>test</scope>
         </dependency>
 
+        <dependency>
+            <groupId>org.springframework.ai</groupId>
+            <artifactId>spring-ai-starter-vector-store-pgvector</artifactId>
+        </dependency>
 
     </dependencies>
 

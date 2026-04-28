@@ -2,17 +2,27 @@ server:
   port: 8090
 
 spring:
-  application:
-    name: springai-lianxi
+  datasource:
+    url: jdbc:postgresql://localhost:5433/spring_ai
+    username: postgres
+    password: postgres   # ← 改成 postgres docker容器的账号密码
+    driver-class-name: org.postgresql.Driver
   ai:
     dashscope:
-      # ====== 这里需要填入你自己的阿里云 API Key ======
-      # 获取地址：https://bailian.console.aliyun.com/
       api-key: sk-8f196f4a6a394c248c15808a619a85ee
       chat:
         options:
-          # 使用 qwen-plus 模型
           model: qwen-plus
+      embedding:          # ：安装“脑子”，让 AI 理解语义
+        enabled: true
+        options:
+          model: text-embedding-v3
+    vectorstore:         # 安装“书架”，让他能存能查
+      pgvector:
+        initialize-schema: true
+        index-type: HNSW
+        distance-type: COSINE_DISTANCE
+
 
 springdoc:
   swagger-ui:
