@@ -40,16 +40,6 @@ public class AiController2 {
 
 
     /**
-     * AI Agent 对话接口
-     * 访问地址：http://localhost:8090/ai/agent?input=现在几点了
-     */
-    @GetMapping("/agent")
-    @Operation(summary = "AI Agent 对话6", description = "使用 ReAct Agent 处理任务")
-    public String agentChat(@RequestParam String input) {
-        return reActAgent.execute(input);
-    }
-
-    /**
      * 快速测试接口（批量测试）
      */
     @GetMapping("/agent/test")
@@ -100,6 +90,27 @@ public class AiController2 {
     @Operation(summary = "上下文存储数据库，恋爱顾问7", description = "基于 RAG 的恋爱顾问")
     public String loveChat(@RequestParam String question) {
         return loveAdvisorService.chat(question);
+    }
+
+
+    /**
+     * ReAct 循环 ,
+     * 工具调用:4 个工具：查时间、查员工、计算器、查知识库
+     * 短期记忆: ChatMemory 保持 20 条上下文
+     * 长期记忆 对话精华存入 VectorStore，重启不丢
+
+     思考 → 行动 → 观察 → 思考
+     思考：“我需要知道用户的信息，然后计算他的入职天数，最后再去知识库里找对应的建议。”
+     行动：它可以主动调用多个工具来获取信息
+     观察：得到工具的返回结果。
+     再思考，再行动：基于结果，决定下一步是继续调用工具，还是整合信息给出最终回答。
+     */
+    @GetMapping("/agent")
+    @Operation(summary = "有记忆 能自主规划，调用工具 8", description = "+RAG+ReAct 思考 → 行动 → 观察 → 再思考 ")
+    public String agentChat(@RequestParam String input) {
+        // ReAct 多步推理：ChatClient 注册工具后自动执行思考→行动→观察循环
+        // RAG 知识库检索：searchLoveKnowledge 工具已经加入 toolCallbacks，可被 Agent 调用
+        return reActAgent.execute(input);
     }
 
 }

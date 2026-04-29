@@ -6,6 +6,7 @@ import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.memory.ChatMemory;
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.tool.ToolCallback;
+import org.springframework.ai.vectorstore.VectorStore;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -21,8 +22,11 @@ public class AgentConfig {
     }
 
     @Bean
-    public ReActAgent reActAgent(ChatClient chatClient, ToolCallback[] toolCallbacks) {
-        return new ReActAgent(chatClient, toolCallbacks);
+    public ReActAgent reActAgent(ChatClient chatClient,
+                                 ToolCallback[] toolCallbacks,
+                                 ChatMemory chatMemory,
+                                 VectorStore vectorStore) {
+        return new ReActAgent(chatClient, toolCallbacks, chatMemory, vectorStore);
     }
 
 
