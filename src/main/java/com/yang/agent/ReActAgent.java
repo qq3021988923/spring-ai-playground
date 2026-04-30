@@ -25,13 +25,13 @@ import java.util.List;
 @Slf4j
 public class ReActAgent extends BaseAgent {
 
-    private final ChatClient chatClient;
+    private final ChatClient chatClient; // 大脑	思考和说话的核心
 
-    private final ToolCallback[] toolCallbacks;   // 注入 ToolCallback 数组
+    private final ToolCallback[] toolCallbacks;   // 注工具箱	具体能干啥（查、算、搜）
 
-    private final ChatMemory chatMemory;   // 新增
+    private final ChatMemory chatMemory;   // 新短期记忆	当下聊天的便签纸
 
-    private final VectorStore vectorStore;
+    private final VectorStore vectorStore; // 长期知识库	永久存储的笔记本
 
 
     public ReActAgent(ChatClient chatClient,  ToolCallback[] toolCallbacks,ChatMemory chatMemory,

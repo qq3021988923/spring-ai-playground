@@ -21,6 +21,11 @@ public class AgentConfig {
         return ChatClient.builder(chatModel).build();
     }
 
+    /*
+    * 把 ChatClient（大脑）、ToolCallbacks[]（工具箱）、
+    * ChatMemory（短期记忆）、VectorStore（长期知识库）全
+    * 部注入到 ReActAgent。
+    * */
     @Bean
     public ReActAgent reActAgent(ChatClient chatClient,
                                  ToolCallback[] toolCallbacks,

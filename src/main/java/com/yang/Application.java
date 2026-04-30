@@ -12,13 +12,11 @@ public class Application {
     public static void main(String[] args) {
         SpringApplication.run(Application.class, args);
 /*
- 启动 pgvector 容器命令
-
-    docker start pgvector
-   验证容器是否运行： docker ps
-
+容器启动命令 会先检查容器是否存在，如果存在就直接启动 docker-compose up -d
+stop 之后 可以使用 docker-compose start 启动
+停止 docker-compose stop
 进入docker里面的数据库
-       docker exec -it pgvector psql -U postgres -d spring_ai
+       docker exec -it yu-ai-pgvector psql -U postgres -d yu_ai_db
 
 * */
        log.info("\n api接口文档：http://localhost:8090/doc.html");

@@ -74,13 +74,15 @@ public class AiController2 {
 
     /**
      * 初始化恋爱知识库
+     * //以后用于多账号隔离的时候，创建的账号 默认初始化，通过账号的id
      */
     @GetMapping("/love/init")
-    @Operation(summary = "初始化恋爱知识库7", description = "加载恋爱知识库到向量数据库")
+    @Operation(summary = "初始化恋爱知识库7", description = "以后用于多账号隔离，创建的账号 默认初始化，通过账号的id存储不同的用户信息")
     public String initLoveKB() {
         loveAdvisorService.init();
         return "恋爱知识库初始化成功！";
     }
+
 
     /**
      * 恋爱顾问 RAG 问答
@@ -91,7 +93,6 @@ public class AiController2 {
     public String loveChat(@RequestParam String question) {
         return loveAdvisorService.chat(question);
     }
-
 
     /**
      * ReAct 循环 ,
@@ -113,4 +114,14 @@ public class AiController2 {
         return reActAgent.execute(input);
     }
 
+    /**
+     * 重新初始化知识库
+     */
+    @GetMapping("/love/reload")
+    @Operation(summary = "清空所有数据，重新加载知识库", description = "清空并重新加载知识库")
+    public String reloadLoveKB() {
+        documentLoader.clearKnowledgeBase();
+        loveAdvisorService.init();
+        return "知识库重新加载成功！";
+    }
 }

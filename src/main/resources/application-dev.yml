@@ -3,7 +3,7 @@ server:
 
 spring:
   datasource:
-    url: jdbc:postgresql://localhost:5433/spring_ai
+    url: jdbc:postgresql://localhost:5433/yu_ai_db
     username: postgres
     password: postgres   # ← 改成 postgres docker容器的账号密码
     driver-class-name: org.postgresql.Driver
@@ -13,15 +13,17 @@ spring:
       chat:
         options:
           model: qwen-plus
-      embedding:          # ：安装“脑子”，让 AI 理解语义
+
+      embedding:          # ：安装“脑子”，让 AI 理解语义 使用阿里云 Embedding 模型向量化
         enabled: true
         options:
           model: text-embedding-v3
+
     vectorstore:         # 安装“书架”，让他能存能查
       pgvector:
         initialize-schema: true
-        index-type: HNSW
-        distance-type: COSINE_DISTANCE
+        index-type: HNSW   #HNSW 索引
+        distance-type: COSINE_DISTANCE # 余弦相似度
 
 
 springdoc:

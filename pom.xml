@@ -95,6 +95,7 @@
             <scope>test</scope>
         </dependency>
 
+<!--        PgVector数据库，  PostgreSQL JDBC 驱动， Spring JDBC-->
         <dependency>
             <groupId>org.springframework.ai</groupId>
             <artifactId>spring-ai-starter-vector-store-pgvector</artifactId>

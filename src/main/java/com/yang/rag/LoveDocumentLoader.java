@@ -11,6 +11,7 @@ import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Collectors;
 
 /**
  * 恋爱知识库加载器
@@ -26,56 +27,14 @@ public class LoveDocumentLoader {
         this.vectorStore = vectorStore;
     }
 
-    /**
-     * 初始化恋爱知识库
-     */
     public void initKnowledgeBase() {
         log.info("正在加载恋爱知识库...");
-
         try {
-            // 1. 准备知识库内容（模拟恋爱常见问题）
-            String knowledgeContent = """
-                # 恋爱常见问题知识库
-                
-                ## 如何表白
-                Q: 喜欢一个人不敢表白怎么办？
-                A: 先建立自信，从小事开始关心对方，找合适时机真诚表达。
-                
-                Q: 表白被拒绝了怎么办？
-                A: 保持尊严，感谢对方，给彼此空间，继续做自己。
-                
-                Q: 怎么判断对方喜不喜欢我？
-                A: 看对方是否愿意花时间陪你，是否关心你的感受，是否主动联系你。
-                
-                ## 相处
-                Q: 恋爱中如何保持新鲜感？
-                A: 一起尝试新事物，给彼此空间，保持沟通，制造小惊喜。
-                
-                Q: 吵架了怎么和好？
-                A: 冷静后主动道歉，换位思考，给对方台阶，有效沟通。
-                
-                Q: 异地恋怎么维持？
-                A: 定期见面，保持每日联系，建立共同目标，信任彼此。
-                
-                ## 单身
-                Q: 单身久了不想谈恋爱怎么办？
-                A: 享受单身生活，提升自己，缘分到了自然来。
-                
-                Q: 如何扩大社交圈？
-                A: 参加活动，培养爱好，保持真诚。
-                """;
-
-            // 2. 创建 Document
-            List<Document> documents = new ArrayList<>();
-            documents.add(new Document(knowledgeContent));
-
-            // 3. 切分文档
+            TextReader reader = new TextReader(new ClassPathResource("document/love-knowledge.md"));
+            List<Document> documents = reader.get();  // 读取文件
             TokenTextSplitter splitter = new TokenTextSplitter();
             List<Document> chunks = splitter.apply(documents);
-
-            // 4. 添加到向量存储(数据库)
             vectorStore.add(chunks);
-
             log.info("知识库加载完成！共 {} 个文档片段", chunks.size());
         } catch (Exception e) {
             log.error("加载知识库失败", e);
@@ -88,8 +47,12 @@ public class LoveDocumentLoader {
     public List<Document> search(String query) {
         log.info("正在检索：{}", query);
         // SearchRequest 搜索请求
-        // 把找到的最相关的 3条数据返回
-        SearchRequest request = SearchRequest.builder().query(query).topK(3).build();
+        // 把找到的最相关的 5条数据返回
+        SearchRequest request = SearchRequest.builder()
+                .query(query)
+                .topK(5)   //　支持 TopK 检索 返回前5个，覆盖面更广
+                .similarityThreshold(0.7)  // 相似度阈值过滤 　只返回真正相关的
+                .build();
 
  /*
           去数据库里执行搜索
@@ -105,6 +68,31 @@ public class LoveDocumentLoader {
         LIMIT 3;这就是你设置的 topK(3)
         */
         return vectorStore.similaritySearch(request);
+    }
+
+    //  vector_store 表里所有知识片段一次性删除 目前
+    public void clearKnowledgeBase() {
+        log.warn("正在清空知识库...");
+        // 简单方案：调用 vectorStore 的删除方法，传入空搜索获取所有ID
+        List<Document> all = vectorStore.similaritySearch(
+                SearchRequest.builder().query("").topK(1000).build()
+        );
+        List<String> ids = all.stream()
+                .map(Document::getId)
+                .filter(id -> id != null)
+                .collect(Collectors.toList());
+        if (!ids.isEmpty()) {
+            vectorStore.delete(ids);
+        }
+        log.info("知识库已清空");
+    }
+
+    public void addKnowledge(String content) {
+        Document doc = new Document(content);
+        TokenTextSplitter splitter = new TokenTextSplitter();
+        List<Document> chunks = splitter.apply(List.of(doc));
+        vectorStore.add(chunks);
+        log.info("新增知识片段：{} 条", chunks.size());
     }
 
 }
