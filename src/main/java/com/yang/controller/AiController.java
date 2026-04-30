@@ -26,7 +26,7 @@ import java.util.List;
  */
 @Slf4j
 @RestController
-@RequestMapping("/ai")
+@RequestMapping("/api/ai")
 @Tag(name = "AI 聊天接口", description = "AI 聊天相关接口")
 public class AiController {
 

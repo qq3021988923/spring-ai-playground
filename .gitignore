@@ -46,6 +46,8 @@ lerna-debug.log*
 node_modules/
 dist/
 
+admin/OA/
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

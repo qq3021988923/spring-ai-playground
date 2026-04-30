@@ -123,8 +123,9 @@ public class AiController2 {
         return "知识库重新加载成功！";
     }
 
+
     @PostMapping("/chat")
-    @Operation(summary = "通用聊天接口", description = "前端调用的聊天接口")
+    @Operation(summary = "通用聊天接口8", description = "前端调用的聊天接口")
     public String chat(@RequestBody ChatRequest request) {
 
         if ("agent".equals(request.getMode())) {
