@@ -1,6 +1,7 @@
 package com.yang.controller;
 
 import com.yang.agent.ReActAgent;
+import com.yang.model.dto.ChatRequest;
 import com.yang.rag.LoveDocumentLoader;
 import com.yang.service.AiService;
 import com.yang.service.LoveAdvisorService;
@@ -9,10 +10,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.model.ChatModel;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 @Slf4j
 @RestController
@@ -99,12 +97,12 @@ public class AiController2 {
      * 工具调用:4 个工具：查时间、查员工、计算器、查知识库
      * 短期记忆: ChatMemory 保持 20 条上下文
      * 长期记忆 对话精华存入 VectorStore，重启不丢
-
-     思考 → 行动 → 观察 → 思考
-     思考：“我需要知道用户的信息，然后计算他的入职天数，最后再去知识库里找对应的建议。”
-     行动：它可以主动调用多个工具来获取信息
-     观察：得到工具的返回结果。
-     再思考，再行动：基于结果，决定下一步是继续调用工具，还是整合信息给出最终回答。
+     * <p>
+     * 思考 → 行动 → 观察 → 思考
+     * 思考：“我需要知道用户的信息，然后计算他的入职天数，最后再去知识库里找对应的建议。”
+     * 行动：它可以主动调用多个工具来获取信息
+     * 观察：得到工具的返回结果。
+     * 再思考，再行动：基于结果，决定下一步是继续调用工具，还是整合信息给出最终回答。
      */
     @GetMapping("/agent")
     @Operation(summary = "有记忆 能自主规划，调用工具 8", description = "+RAG+ReAct 思考 → 行动 → 观察 → 再思考 ")
@@ -123,5 +121,20 @@ public class AiController2 {
         documentLoader.clearKnowledgeBase();
         loveAdvisorService.init();
         return "知识库重新加载成功！";
+    }
+
+    @PostMapping("/chat")
+    @Operation(summary = "通用聊天接口", description = "前端调用的聊天接口")
+    public String chat(@RequestBody ChatRequest request) {
+
+        if ("agent".equals(request.getMode())) {
+            // Agent 模式
+            return reActAgent.execute(request.getMessage());
+        } else if ("love".equals(request.getMode())) {
+            // 恋爱顾问模式
+            return loveAdvisorService.chat(request.getMessage());
+        }
+
+        return "";
     }
 }
