@@ -107,6 +107,7 @@ public class AiController2 {
     @GetMapping("/agent")
     @Operation(summary = "有记忆 能自主规划，调用工具 8", description = "+RAG+ReAct 思考 → 行动 → 观察 → 再思考 ")
     public String agentChat(@RequestParam String input) {
+
         // ReAct 多步推理：ChatClient 注册工具后自动执行思考→行动→观察循环
         // RAG 知识库检索：searchLoveKnowledge 工具已经加入 toolCallbacks，可被 Agent 调用
         return reActAgent.execute(input);
@@ -123,10 +124,10 @@ public class AiController2 {
         return "知识库重新加载成功！";
     }
 
-
     @PostMapping("/chat")
     @Operation(summary = "通用聊天接口8", description = "前端调用的聊天接口")
     public String chat(@RequestBody ChatRequest request) {
+        System.out.println("我是" + request.getMode());
 
         if ("agent".equals(request.getMode())) {
             // Agent 模式

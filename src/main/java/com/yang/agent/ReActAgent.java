@@ -50,8 +50,11 @@ public class ReActAgent extends BaseAgent {
 
         // ===== 新增：强制检索，先从数据库拿数据 =====
         List<Document> relatedDocs = vectorStore.similaritySearch(
-                SearchRequest.builder().query(userInput).topK(3).build()
+                SearchRequest.builder().query(userInput).topK(5) //　支持 TopK 检索 返回前5个，覆盖面更广
+                        .similarityThreshold(0.7)  // 相似度阈值过滤 　只返回真正相关
+                        .build()
         );
+
 
         StringBuilder context = new StringBuilder();
         context.append("以下是知识库中可能相关的历史记录：\n\n");
@@ -61,13 +64,22 @@ public class ReActAgent extends BaseAgent {
         String historyContext = context.toString();
 
         String systemPrompt = """
-        你是 %s，%s。
-        
-        请按以下步骤工作：
-        1. 先理解用户的需求
-        2. 如果用户的问题涉及个人信息或历史记录，请优先参考“历史记录”中的内容
-        3. 如果需要其他工具（计算器、查员工、查时间），可以调用
-        4. 整合所有信息，给出最终答案
+                你是 %s，%s。
+                你是【行业/专业角色】，拥有10年以上资深经验。
+                任务：【明确要做的事】
+                背景信息：【补充上下文、素材、需求背景】
+       
+                请按以下步骤工作 严格要求：
+                1. 先理解用户的需求
+                2. 如果用户的问题涉及个人信息或历史记录，请优先参考“历史记录”中的内容
+                3. 如果需要其他工具（计算器、查员工、查时间），可以调用
+                4. 语言：【中文/简洁专业/口语化/正式书面】
+                5. 结构：分点作答、逻辑清晰、拒绝废话
+                6. 字数：【不限/500字内/精简短句】
+                7. 禁止：重复内容、空洞套话、过度修饰
+                8. 整合结论，给出完整可行方案
+                输出格式：Markdown排版，文中标点符号使用句号或者逗号代替，内容不要造假
+
         """.formatted(agentName, agentDescription);
 
         // 把检索到的历史记录拼接到用户问题前面
@@ -76,7 +88,7 @@ public class ReActAgent extends BaseAgent {
         // 调用 AI（带工具支持）
         String answer = chatClient.prompt()
                 .system(systemPrompt)  // 顶层命令
-                .user(enhancedInput)        // 用户问题
+                .user(enhancedInput)        // 用户问题+查询历史
                 .toolCallbacks(toolCallbacks)   // 注册工具（计算器、查员工、搜索知识库、查时间）
                 // 关键修改：使用 Builder 模式创建 MessageChatMemoryAdvisor
                 .advisors(MessageChatMemoryAdvisor.builder(chatMemory).build()) // 短期记忆

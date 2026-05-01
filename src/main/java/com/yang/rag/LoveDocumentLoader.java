@@ -29,7 +29,7 @@ public class LoveDocumentLoader {
 
     public void initKnowledgeBase() {
         log.info("正在加载恋爱知识库...");
-        try {
+        try { // 读取本地初始化数据
             TextReader reader = new TextReader(new ClassPathResource("document/love-knowledge.md"));
             List<Document> documents = reader.get();  // 读取文件
             TokenTextSplitter splitter = new TokenTextSplitter();

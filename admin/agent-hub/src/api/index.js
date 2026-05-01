@@ -1,11 +1,9 @@
 import axios from 'axios'
 
-export const chatAgent = (message) => {
-  return axios.get('http://localhost:8090/ai/agent', {
-    params: { input: message }
-  }).then(res => res.data)
+export const chat = (data) => {
+  return axios.post('http://localhost:8090/ai/chat', data).then(res => res.data)
 }
 
 export default {
-  chatAgent
+  chat
 }
