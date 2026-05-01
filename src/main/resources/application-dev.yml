@@ -8,16 +8,26 @@ spring:
     password: postgres   # ← 改成 postgres docker容器的账号密码
     driver-class-name: org.postgresql.Driver
   ai:
+    chat:
+      client:
+        enabled: false  # 禁止自动创建 ChatClient.Builder
     dashscope:
       api-key: sk-8f196f4a6a394c248c15808a619a85ee
       chat:
         options:
           model: qwen-plus
 
+
       embedding:          # ：安装“脑子”，让 AI 理解语义 使用阿里云 Embedding 模型向量化
         enabled: true
         options:
           model: text-embedding-v3
+
+    ollama:
+      base-url: http://localhost:11434
+      chat:
+        model: qwen2.5:0.5b   # 约 400 MB，几乎不占空间。
+          # 其他可选：qwen2.5:3b / llama3.2 / gemma3:1b
 
     vectorstore:         # 安装“书架”，让他能存能查
       pgvector:

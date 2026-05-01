@@ -35,7 +35,7 @@ import java.util.concurrent.ConcurrentHashMap;
 @RequiredArgsConstructor
 public class AiService {
 
-    @Resource
+    @Resource(name = "dashscopeChatModel")
     private ChatModel chatModel;
 
     // 在 AiService 顶部注入

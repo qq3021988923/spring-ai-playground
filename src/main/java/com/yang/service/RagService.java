@@ -26,7 +26,7 @@ import java.util.List;
 @Service
 public class RagService {
 
-    @Resource
+    @Resource(name = "dashscopeChatModel")
     private ChatModel chatModel;
 
     // 内存存储：存储切分后的文档片段

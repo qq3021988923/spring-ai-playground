@@ -31,7 +31,7 @@ import java.util.List;
 public class AiController {
 
     // 注入 Spring AI 提供的 ChatModel，会自动使用我们配置的阿里云百炼
-    @Resource
+    @Resource(name = "dashscopeChatModel")
     private ChatModel chatModel;
 
     // ====== 注入 AiService ======
