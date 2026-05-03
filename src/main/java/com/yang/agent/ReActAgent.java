@@ -21,7 +21,7 @@ public class ReActAgent extends BaseAgent {
     public ReActAgent(ChatClient chatClient,
                       ChatMemory chatMemory,
                       ToolCallbackProvider mcpToolProvider,VectorStore vectorStore) {
-        super("智能助手小智", "一个会思考、会用工具的 AI 助手");
+        super("智能助手小杨", "一个会思考、会用工具的 AI 助手");
         this.chatClient = chatClient;
         this.chatMemory = chatMemory;
         this.mcpToolProvider = mcpToolProvider;
@@ -33,16 +33,14 @@ public class ReActAgent extends BaseAgent {
         log("收到任务：" + userInput);
         log("========== Agent 开始工作 ==========");
 
-        int mcpCount = 0;
-        try {
-            var mcpTools = mcpToolProvider.getToolCallbacks();
-            if (mcpTools != null) {
-                mcpCount = mcpTools.length;
-            }
-        } catch (Exception e) {
-            log.warn("MCP 工具获取失败: {}", e.getMessage());
-        }
-        log.info("MCP工具数量: {}", mcpCount);
+//        int mcpCount = 0;
+//        try {
+//            var mcpTools = mcpToolProvider.getToolCallbacks();
+//            mcpCount = mcpTools.length;
+//        } catch (Exception e) {
+//            log.warn("MCP 工具获取失败: {}", e.getMessage());
+//        }
+//        log.info("MCP工具数量: {}", mcpCount);
 
         String systemPrompt = """
         你是 %s，%s。
