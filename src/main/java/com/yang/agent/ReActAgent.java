@@ -4,22 +4,28 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.client.advisor.MessageChatMemoryAdvisor;
 import org.springframework.ai.chat.memory.ChatMemory;
+import org.springframework.ai.document.Document;
 import org.springframework.ai.tool.ToolCallbackProvider;
+import org.springframework.ai.vectorstore.VectorStore;
+
+import java.util.List;
 
 @Slf4j
 public class ReActAgent extends BaseAgent {
 
-    private final ChatClient chatClient;
-    private final ChatMemory chatMemory;
-    private final ToolCallbackProvider mcpToolProvider;
+    private final ChatClient chatClient; // Spring AI 自动配置，是 Agent 的“大脑”。
+    private final ChatMemory chatMemory; // 由你写的 ChatMemoryConfig 创建，负责短期记忆。
+    private final ToolCallbackProvider mcpToolProvider; // MCP 客户端连接成功后，Spring AI 自动创建，封装所有外部工具。
+    private final VectorStore vectorStore;  // 新增，长期记忆
 
     public ReActAgent(ChatClient chatClient,
                       ChatMemory chatMemory,
-                      ToolCallbackProvider mcpToolProvider) {
+                      ToolCallbackProvider mcpToolProvider,VectorStore vectorStore) {
         super("智能助手小智", "一个会思考、会用工具的 AI 助手");
         this.chatClient = chatClient;
         this.chatMemory = chatMemory;
         this.mcpToolProvider = mcpToolProvider;
+        this.vectorStore=vectorStore;
     }
 
     @Override
@@ -53,6 +59,13 @@ public class ReActAgent extends BaseAgent {
                 .call()
                 .content();
 
+        String newKnowledge = """
+        用户问题：%s
+        智能助手回答：%s
+        """.formatted(userInput, answer);
+        Document newDoc = new Document(newKnowledge);
+        vectorStore.add(List.of(newDoc));
+        log("本轮对话已存入知识库");
         log("========== Agent 结束工作 ==========");
         return answer;
     }

@@ -19,7 +19,7 @@ stop 之后 可以使用 docker-compose start 启动
 进入docker里面的数据库
        docker exec -it yu-ai-pgvector psql -U postgres -d yu_ai_db
 
- select count(*) from vector_store;
+        select count(*) from vector_store;
 * */
        log.info("\n api接口文档：http://localhost:8090/doc.html");
     }
