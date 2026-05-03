@@ -24,6 +24,12 @@ const modes = {
     name: '恋爱顾问小红娘',
     hint: '试试问：不敢表白怎么办？ / 吵架了怎么和好？',
     color: '#F56C6C'
+  },
+  ollama: {
+    icon: '🦙',
+    name: 'Ollama 本地模型',
+    hint: '试试问：用 Python 写个冒泡排序 / 解释一下什么是递归',
+    color: '#67C23A'
   }
 }
 
@@ -71,7 +77,7 @@ const handleKeyDown = (e) => {
       <span class="header-icon">{{ current().icon }}</span>
       <div class="header-info">
         <span class="header-name">{{ current().name }}</span>
-        <span class="header-desc">{{ props.mode === 'agent' ? 'ReAct Agent · 工具调用' : 'RAG 检索增强 · 知识库问答' }}</span>
+        <span class="header-desc">{{ props.mode === 'agent' ? 'ReAct Agent · 工具调用' : props.mode === 'love' ? 'RAG 检索增强 · 知识库问答' : '本地模型 · 免费· 离线 · 隐私安全' }}</span>
       </div>
     </div>
 

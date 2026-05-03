@@ -1,10 +1,7 @@
 package com.yang.service;
 
 import com.yang.model.LoveAdvice;
-import com.yang.tools.MyTools;
-import jakarta.annotation.PostConstruct;
 import jakarta.annotation.Resource;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.messages.AssistantMessage;
@@ -16,9 +13,7 @@ import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.chat.prompt.Prompt;
 import org.springframework.ai.chat.prompt.PromptTemplate;
 import org.springframework.ai.converter.BeanOutputConverter;
-import org.springframework.ai.support.ToolCallbacks;
-import org.springframework.ai.tool.ToolCallback;
-import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.ai.tool.ToolCallbackProvider;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
@@ -26,32 +21,20 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
-/**
- * AI 服务类
- * 学习第2步：系统提示词 + 结构化输出
- */
 @Slf4j
 @Service
-@RequiredArgsConstructor
 public class AiService {
 
     @Resource(name = "dashscopeChatModel")
     private ChatModel chatModel;
 
-    // 在 AiService 顶部注入
     @Resource
     private ChatClient.Builder chatClientBuilder;
 
     @Resource
-    private final ToolCallback[] toolCallbacks;   // 注入 ToolCallback 数组
+    private ToolCallbackProvider toolCallbackProvider;
 
-
-    /**
-     * 示例1：使用系统提示词，让 AI 扮演特定角色
-     * 比如：让 AI 扮演一个恋爱顾问
-     */
     public String chatAsLoveAdvisor(String userMessage) {
-        // 系统提示词：设定 AI 的角色和行为
         String systemPrompt = """
             你是一位专业的恋爱顾问，名叫"小红娘"。
             你的特点是：
@@ -63,12 +46,10 @@ public class AiService {
             请用这个身份与用户对话。
             """;
 
-        // 构建消息列表：系统消息 + 用户消息
         List<Message> messages = List.of(
                 new SystemMessage(systemPrompt),
                 new UserMessage(userMessage)
         );
-        System.out.println("构建消息列表=="+messages);
 
         ChatResponse response = chatModel.call(new Prompt(messages));
         String answer = response.getResult().getOutput().getText();
@@ -76,15 +57,8 @@ public class AiService {
         return answer;
     }
 
-    /**
-     * 示例2：结构化输出 - 将 AI 的回复转换为 Java 对象
-     * 比如：让 AI 生成一个恋爱建议对象
-     */
     public LoveAdvice getLoveAdvice(String situation) {
-        // 创建输出转换器，指定要转换的目标类
         BeanOutputConverter<LoveAdvice> converter = new BeanOutputConverter<>(LoveAdvice.class);
-        System.out.println("66666"+converter);
-        // 用户提示词，告诉 AI 我们需要什么格式
         String userPrompt = """
             请根据以下情况，给出恋爱建议：
             %s
@@ -93,30 +67,16 @@ public class AiService {
             %s
             """.formatted(situation, converter.getFormat());
 
-        // 调用 AI
         String jsonResponse = chatModel.call(userPrompt);
         log.info("AI 返回的 JSON：{}", jsonResponse);
 
-        // 将 JSON 转换为 Java 对象
-            LoveAdvice loveAdvice = converter.convert(jsonResponse);
+        LoveAdvice loveAdvice = converter.convert(jsonResponse);
         return loveAdvice;
     }
 
-
-    // ====== 会话记忆：存储每个用户的对话历史 ======
-    // 注意：实际项目中应该用 Redis 或数据库存储，这里为了演示用 Map
     private final Map<String, List<Message>> chatMemory = new ConcurrentHashMap<>();
 
-
-    /**
-     * 示例3：使用 Prompt Template（提示词模板） 比上面多个这个 PromptTemplate
-     * 比如：写一封邮件
-     * recipient：接收人
-     * tone：语气
-     * content：内容
-     */
     public String writeEmail(String recipient, String tone, String content) {
-        // 定义提示词模板，使用 {变量名} 占位
         String promptTemplate = """
             请帮我写一封邮件。
             
@@ -127,84 +87,62 @@ public class AiService {
             请直接写出邮件正文，不需要其他说明。
             """;
 
-        // 创建 PromptTemplate 对象
         PromptTemplate template = new PromptTemplate(promptTemplate);
-
-        // 填充变量
         Prompt prompt = template.create(Map.of(
                 "recipient", recipient,
                 "tone", tone,
                 "content", content
         ));
 
-        // 调用 AI
         ChatResponse response = chatModel.call(prompt);
         String email = response.getResult().getOutput().getText();
         log.info("生成的邮件：{}", email);
         return email;
     }
 
-    /**
-     * 示例4：带记忆的对话（Chat Memory）
-     * 每个 userId 对应一个独立的对话历史
-     */
     public String chatWithMemory(String userId, String userMessage) {
-        // 获取或初始化该用户的对话历史
         List<Message> messages = chatMemory.computeIfAbsent(userId, k -> {
             List<Message> init = new ArrayList<>();
-            // 添加系统提示词
             init.add(new SystemMessage("你是一个 helpful 的 AI 助手。"));
             return init;
         });
 
-        // 添加当前用户消息
         messages.add(new UserMessage(userMessage));
 
-        // 调用 AI
         ChatResponse response = chatModel.call(new Prompt(messages));
         String answer = response.getResult().getOutput().getText();
 
-        // 保存 AI 回复到历史记录3
         messages.add(new AssistantMessage(answer));
-        log.info("对话历史长度：{}", messages);
         log.info("用户 {} 的对话历史长度：{}", userId, messages.size());
         return answer;
     }
 
-    /**
-     * 清空某个用户的对话记忆
-     */
     public void clearMemory(String userId) {
         chatMemory.remove(userId);
         log.info("已清空用户 {} 的对话记忆", userId);
     }
 
+    public String chatWithMcp(String userMessage) {
+        log.info("收到MCP消息：{}", userMessage);
 
-    // ====== 新增：带工具调用的对话 ======
-
-    /**
-     * 带工具调用的 AI 对话
-     * AI 可以根据需要自动调用我们注册的工具
-     */
-
-
-
-    /**
-     * 带工具调用的 AI 对话（使用 ChatClient）
-     */
-    public String chatWithTools(String userMessage) {
-        log.info("收到消息（带工具调用）：{}", userMessage);
+        var mcpTools = toolCallbackProvider.getToolCallbacks();
+        log.info("MCP工具数量: {}", mcpTools != null ? mcpTools.length : 0);
+        if (mcpTools != null) {
+            for (var tool : mcpTools) {
+                log.info("MCP工具: {} - {}", tool.getToolDefinition().name(), tool.getToolDefinition().description());
+            }
+        }
 
         String answer = chatClientBuilder
-                .build()                         // 每次构建新的 ChatClient
+                .build()
                 .prompt()
-                .toolCallbacks(toolCallbacks)    // ✅ 直接传入 ToolCallback 数组
-                .system("你是一个智能助手，可以使用提供的工具来回答问题。")
+                .toolCallbacks(toolCallbackProvider)
+                .system("你是一个智能助手，可以使用 MCP 提供的远程工具来回答问题。当用户询问天气、翻译、新闻等问题时，请调用对应的工具。")
                 .user(userMessage)
                 .call()
                 .content();
 
-        log.info("AI 回复：{}", answer);
+        log.info("MCP AI 回复：{}", answer);
         return answer;
     }
 }

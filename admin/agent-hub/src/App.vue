@@ -19,6 +19,10 @@ const mode = ref('agent')
           :class="['tab', { active: mode === 'love' }]"
           @click="mode = 'love'"
         >💕 恋爱顾问</button>
+        <button
+          :class="['tab', { active: mode === 'ollama' }]"
+          @click="mode = 'ollama'"
+        >🦙 Ollama</button>
       </div>
     </nav>
 

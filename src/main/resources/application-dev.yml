@@ -1,3 +1,62 @@
+#  server:
+#    port: 8090
+#
+#  spring:
+#    datasource:
+#      url: jdbc:postgresql://localhost:5433/yu_ai_db
+#      username: postgres
+#      password: postgres   # ← 改成 postgres docker容器的账号密码
+#      driver-class-name: org.postgresql.Driver
+#
+#    ai:
+#      chat:
+#        client:
+#          enabled: false  # 禁止自动创建 ChatClient.Builder
+#      dashscope:
+#        api-key: sk-8f196f4a6a394c248c15808a619a85ee
+#        chat:
+#          options:
+#            model: qwen-plus
+#
+#
+#        embedding:          # ：安装“脑子”，让 AI 理解语义 使用阿里云 Embedding 模型向量化
+#          enabled: true
+#          options:
+#            model: text-embedding-v3
+#
+#      ollama:
+#        base-url: http://localhost:11434
+#        chat:
+#          model: qwen2.5:0.5b   # 约 400 MB，几乎不占空间。
+#            # 其他可选：qwen2.5:3b / llama3.2 / gemma3:1b
+#
+#      vectorstore:         # 安装“书架”，让他能存能查
+#        pgvector:
+#          initialize-schema: true
+#          index-type: HNSW   #HNSW 索引
+#          distance-type: COSINE_DISTANCE # 余弦相似度
+#
+#
+#  springdoc:
+#    swagger-ui:
+#      path: /swagger-ui.html
+#    api-docs:
+#      path: /v3/api-docs
+#    group-configs:
+#      - group: 'default'
+#        paths-to-match: '/**'
+#        packages-to-scan: com.yang.controller
+#
+#  knife4j:
+#    enable: true
+#    setting:
+#      language: zh_cn
+#
+#  # 日志配置，方便看 Spring AI 的调用细节
+#  logging:
+#    level:
+#      org.springframework.ai: DEBUG
+
 server:
   port: 8090
 
@@ -5,20 +64,25 @@ spring:
   datasource:
     url: jdbc:postgresql://localhost:5433/yu_ai_db
     username: postgres
-    password: postgres   # ← 改成 postgres docker容器的账号密码
+    password: postgres
     driver-class-name: org.postgresql.Driver
+
   ai:
+    mcp:
+      client:
+        stdio:
+          servers-configuration: classpath:mcp-servers.json
+
     chat:
       client:
-        enabled: false  # 禁止自动创建 ChatClient.Builder
+        enabled: false  # 如果你不手动创建 ChatClient 的话可以禁用自动配置
+
     dashscope:
       api-key: sk-8f196f4a6a394c248c15808a619a85ee
       chat:
         options:
           model: qwen-plus
-
-
-      embedding:          # ：安装“脑子”，让 AI 理解语义 使用阿里云 Embedding 模型向量化
+      embedding:
         enabled: true
         options:
           model: text-embedding-v3
@@ -26,15 +90,14 @@ spring:
     ollama:
       base-url: http://localhost:11434
       chat:
-        model: qwen2.5:0.5b   # 约 400 MB，几乎不占空间。
-          # 其他可选：qwen2.5:3b / llama3.2 / gemma3:1b
+        options:
+          model: qwen2.5:0.5b
 
-    vectorstore:         # 安装“书架”，让他能存能查
+    vectorstore:
       pgvector:
         initialize-schema: true
-        index-type: HNSW   #HNSW 索引
-        distance-type: COSINE_DISTANCE # 余弦相似度
-
+        index-type: HNSW
+        distance-type: COSINE_DISTANCE
 
 springdoc:
   swagger-ui:
@@ -51,7 +114,6 @@ knife4j:
   setting:
     language: zh_cn
 
-# 日志配置，方便看 Spring AI 的调用细节
 logging:
   level:
     org.springframework.ai: DEBUG

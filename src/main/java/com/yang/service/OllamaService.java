@@ -1,16 +1,20 @@
 package com.yang.service;
 
+import com.yang.rag.LoveDocumentLoader;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.ai.chat.messages.AssistantMessage;
+import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.ai.chat.client.advisor.MessageChatMemoryAdvisor;
+import org.springframework.ai.chat.memory.ChatMemory;
 import org.springframework.ai.chat.model.ChatModel;
-import org.springframework.ai.chat.prompt.Prompt;
+import org.springframework.ai.document.Document;
+import org.springframework.ai.tool.ToolCallbackProvider;
+import org.springframework.ai.vectorstore.VectorStore;
 import org.springframework.stereotype.Service;
 
-/**
- * Ollama 本地大模型服务
- * 学习：本地运行开源大模型，不依赖云服务
- */
+import java.util.List;
+import java.util.stream.Collectors;
+
 @Slf4j
 @Service
 public class OllamaService {
@@ -18,24 +22,50 @@ public class OllamaService {
     @Resource(name = "ollamaChatModel")
     private ChatModel ollamaChatModel;
 
-    /**
-     * 使用本地 Ollama 模型对话
-     */
-    public String chat(String message) {
-        log.info("使用 Ollama 本地模型处理消息：{}", message);
+    @Resource
+    private VectorStore vectorStore;
 
-        try {
-            AssistantMessage response = ollamaChatModel.call(new Prompt(message))
-                    .getResult()
-                    .getOutput();
+    @Resource
+    private LoveDocumentLoader loveDocumentLoader;
 
-            String answer = response.getText();
-            log.info("Ollama 回复：{}", answer);
-            return answer;
-        } catch (Exception e) {
-            log.error("Ollama 调用失败", e);
-            return "Ollama 调用失败：" + e.getMessage() + "\n\n请确保 Ollama 已启动！\n安装命令：https://ollama.com";
-        }
+    @Resource
+    private ToolCallbackProvider toolCallbackProvider;
+
+    @Resource
+    private ChatMemory chatMemory;
+
+    public String fullAgentChat(String userMessage) {
+        ChatClient localClient = ChatClient.builder(ollamaChatModel).build();
+
+        String systemPrompt = """
+                你是智能助手小智，一个能在本地运行、拥有多种能力的 AI。
+                你可以使用 MCP 提供的远程工具来帮助用户。
+                工作步骤：
+                1. 理解用户需求，判断是否需要工具
+                2. 调用工具获取信息
+                3. 整合信息给出最终答案
+        """;
+
+        String historyContext = loveDocumentLoader.search(userMessage).stream()
+                .map(Document::getText)
+                .collect(Collectors.joining("\n\n"));
+
+        String answer = localClient.prompt()
+                .system(systemPrompt)
+                .user("知识库相关内容：\n" + historyContext + "\n\n用户问题：" + userMessage)
+                .toolCallbacks(toolCallbackProvider)
+                .advisors(MessageChatMemoryAdvisor.builder(chatMemory).build())
+                .call()
+                .content();
+
+        String newKnowledge = """
+            用户问题：%s
+            智能助手回答：%s
+            """.formatted(userMessage, answer);
+        Document newDoc = new Document(newKnowledge);
+        vectorStore.add(List.of(newDoc));
+        log.info("本地 Agent 对话已存入知识库");
+
+        return answer;
     }
-
 }

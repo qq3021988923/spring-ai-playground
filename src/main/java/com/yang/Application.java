@@ -12,6 +12,7 @@ public class Application {
     public static void main(String[] args) {
         SpringApplication.run(Application.class, args);
 /*
+在当前根目录打开窗口
 容器启动命令 会先检查容器是否存在，如果存在就直接启动 docker-compose up -d
 stop 之后 可以使用 docker-compose start 启动
 停止 docker-compose stop
