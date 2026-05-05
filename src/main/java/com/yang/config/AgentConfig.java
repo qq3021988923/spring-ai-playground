@@ -4,6 +4,7 @@ import com.yang.agent.ReActAgent;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.memory.ChatMemory;
 import org.springframework.ai.chat.model.ChatModel;
+import org.springframework.ai.tool.ToolCallback;
 import org.springframework.ai.tool.ToolCallbackProvider;
 import org.springframework.ai.vectorstore.VectorStore;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -37,8 +38,9 @@ public class AgentConfig {
 
     @Bean
     public ReActAgent reActAgent(ChatClient chatClient,
+                                 ToolCallback[] toolCallbacks,
                                  ChatMemory chatMemory,
-                                 ToolCallbackProvider mcpToolProvider, VectorStore vectorStore) {
-        return new ReActAgent(chatClient, chatMemory, mcpToolProvider,vectorStore);
+                                 VectorStore vectorStore) {
+        return new ReActAgent(chatClient, chatMemory, vectorStore, toolCallbacks);
     }
 }

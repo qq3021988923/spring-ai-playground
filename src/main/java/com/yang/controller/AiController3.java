@@ -1,11 +1,13 @@
 package com.yang.controller;
 
 
+import com.yang.service.JokeService;
 import com.yang.service.OllamaService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -20,7 +22,8 @@ public class AiController3 {
     @Resource
     private OllamaService ollamaService;
 
-
+    @Resource
+    private JokeService jokeService;
 
     /**
      * Ollama 本地模型对话 没有云端execute (云端 Agent)的强大 本地小模型 (如 qwen2.5:0.5b)
@@ -34,7 +37,13 @@ public class AiController3 {
         return ollamaService.fullAgentChat(message);
     }
 
-
+    @GetMapping("/joke")
+    @Operation(summary = "纯 LangChain4j 9",
+            description = "支持临时记忆，重启后丢失，无工具/RAG/存数据库功能")
+    public String tellMeAJoke(@RequestParam(defaultValue = "default",required = false) String chatId,
+                              @RequestParam String message) {
+        return jokeService.tellJoke(chatId,message);
+    }
 
 
 }

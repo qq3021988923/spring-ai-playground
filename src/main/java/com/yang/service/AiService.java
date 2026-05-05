@@ -13,7 +13,8 @@ import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.chat.prompt.Prompt;
 import org.springframework.ai.chat.prompt.PromptTemplate;
 import org.springframework.ai.converter.BeanOutputConverter;
-import org.springframework.ai.tool.ToolCallbackProvider;
+import org.springframework.ai.tool.ToolCallback;
+
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
@@ -32,7 +33,9 @@ public class AiService {
     private ChatClient.Builder chatClientBuilder;
 
     @Resource
-    private ToolCallbackProvider toolCallbackProvider;
+    private ToolCallback[] toolCallbacks;   // 本地工具数组
+
+
 
     public String chatAsLoveAdvisor(String userMessage) {
         String systemPrompt = """
@@ -125,19 +128,12 @@ public class AiService {
     public String chatWithMcp(String userMessage) {
         log.info("收到MCP消息：{}", userMessage);
 
-        var mcpTools = toolCallbackProvider.getToolCallbacks();
-        log.info("MCP工具数量: {}", mcpTools != null ? mcpTools.length : 0);
-        if (mcpTools != null) {
-            for (var tool : mcpTools) {
-                log.info("MCP工具: {} - {}", tool.getToolDefinition().name(), tool.getToolDefinition().description());
-            }
-        }
 
         String answer = chatClientBuilder
                 .build()
                 .prompt()
-                .toolCallbacks(toolCallbackProvider)
-                .system("你是一个智能助手，可以使用 MCP 提供的远程工具来回答问题。当用户询问天气、翻译、新闻等问题时，请调用对应的工具。")
+                .toolCallbacks(toolCallbacks)
+                .system("你是一个智能助手，可以使用提供的工具来回答问题。")
                 .user(userMessage)
                 .call()
                 .content();

@@ -1,6 +1,9 @@
 package com.yang.mcp.tools;
 
 import cn.hutool.http.HttpUtil;
+import cn.hutool.json.JSONArray;
+import cn.hutool.json.JSONObject;
+import cn.hutool.json.JSONUtil;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.tool.annotation.Tool;
 import org.springframework.ai.tool.annotation.ToolParam;
@@ -18,7 +21,9 @@ public class WeatherTool {
     执行 http://wttr.in/... 的 HTTP 调用。
     返回标准化响应：MCP Server 将天气结果序列化为 JSON，写回自己的标准输出（stdout）。
     Agent接收结果：主 Agent 从子进程的标准输入（stdin） 读到响应，解析出天气信息，继续生成最终回答。*/
-    private static final String API_URL = "https://wttr.in/";
+  /*
+   // 免费的
+   private static final String API_URL = "https://wttr.in/";
 
     //   // @Tool 注解将普通方法变为 AI 可调用的工具。描述信息对 AI 调用至关重要。
     @Tool(description = "查询指定城市的实时天气情况")
@@ -35,6 +40,66 @@ public class WeatherTool {
             log.error("查询天气失败", e);
             return "抱歉，查询" + city + "天气失败：" + e.getMessage();
         }
+    }*/
+
+
+
+
+    // 你的专属 API Host（从控制台获取） 目前使用的是和风天气的的
+    private static final String API_HOST = "m34y3m7r4a.re.qweatherapi.com";
+    // 你的 API Key（也在控制台中，通常叫做 Key 或 Token）
+    private static final String API_KEY = "37e1e8036ed445bb984fde9b10b2188c";
+
+    // 接口路径（保持默认）
+    private static final String GEO_PATH = "/v2/city/lookup";
+    private static final String WEATHER_PATH = "/v7/weather/now";
+
+    @Tool(description = "查询指定城市的实时天气情况")
+    public String getWeather(@ToolParam(description = "城市名称，如 北京、上海") String city) {
+        log.info("[MCP] 查询 {} 天气 (和风天气)", city);
+
+        try {
+            // 1. 获取城市 ID
+            String cityId = getCityId(city);
+            if (cityId == null) {
+                return "抱歉，未找到城市：" + city;
+            }
+
+            // 2. 查询实时天气
+            String weatherUrl = "https://" + API_HOST + WEATHER_PATH + "?location=" + cityId + "&key=" + API_KEY;
+            String response = HttpUtil.get(weatherUrl, 5000);
+            JSONObject json = JSONUtil.parseObj(response);
+
+            JSONObject now = json.getJSONObject("now");
+            if (now == null) {
+                return "抱歉，查询" + city + "天气失败，API返回异常。";
+            }
+
+            return String.format(
+                    "%s实时天气：\n🌡 温度：%s℃\n💧 湿度：%s%%\n🌤 天气：%s\n💨 风力：%s级",
+                    city,
+                    now.getStr("temp"),
+                    now.getStr("humidity"),
+                    now.getStr("text"),
+                    now.getStr("windScale")
+            );
+
+        } catch (Exception e) {
+            log.error("查询天气失败", e);
+            return "抱歉，查询" + city + "天气失败：" + e.getMessage();
+        }
+    }
+
+    // 通过城市名获取城市ID
+    private String getCityId(String city) {
+        String url = "https://" + API_HOST + GEO_PATH + "?location=" + city + "&key=" + API_KEY;
+        String response = HttpUtil.get(url, 5000);
+        JSONObject json = JSONUtil.parseObj(response);
+        JSONArray locations = json.getJSONArray("location");
+        if (locations != null && !locations.isEmpty()) {
+            return locations.getJSONObject(0).getStr("id");
+        }
+        return null;
     }
 
 }

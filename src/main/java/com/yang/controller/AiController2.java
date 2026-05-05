@@ -34,8 +34,6 @@ public class AiController2 {
     @Resource
     private OllamaService ollamaService;
 
-    @Resource
-    private ToolCallbackProvider toolCallbackProvider;
 
     @GetMapping("/chat/tools")
     @Operation(summary = "带工具调用的对话5", description = "AI 可以自动调用工具")
@@ -43,17 +41,13 @@ public class AiController2 {
         return aiService.chatWithMcp(message);
     }
 
-    @GetMapping("/mcp/test")
-    @Operation(summary = "MCP工具测试", description = "测试 MCP 第三方工具是否可用")
-    public String mcpTest(@RequestParam String message) {
-        log.info("=== MCP 测试接口被调用 ===");
-        var tools = toolCallbackProvider.getToolCallbacks();
-        log.info("MCP工具数量: {}", tools.length);
-        for (var tool : tools) {
-            log.info("可用工具: {} - {}", tool.getToolDefinition().name(), tool.getToolDefinition().description());
-        }
-        return aiService.chatWithMcp(message);
-    }
+//    @GetMapping("/mcp/test")
+//    @Operation(summary = "MCP工具测试", description = "测试 MCP 第三方工具是否可用")
+//    public String mcpTest(@RequestParam String message) {
+//        log.info("=== MCP 测试接口被调用 ===");
+//
+//        return aiService.chatWithMcp(message);
+//    }
 
     @GetMapping("/agent/test")
     @Operation(summary = "Agent 测试6", description = "测试 Agent 的各种能力")
@@ -85,6 +79,7 @@ public class AiController2 {
         return loveAdvisorService.chat(question);
     }
 
+    // http://localhost:8090/ai/agent?input=查询桂林天气
     @GetMapping("/agent")
     @Operation(summary = "有记忆 能自主规划，调用工具 8", description = "ReAct Agent + MCP 工具")
     public String agentChat(@RequestParam String input) {
