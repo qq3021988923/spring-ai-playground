@@ -1,75 +1,50 @@
 package com.yang.agent;
 
+import lombok.Data;
+import lombok.EqualsAndHashCode;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.ai.chat.client.ChatClient;
-import org.springframework.ai.chat.client.advisor.MessageChatMemoryAdvisor;
-import org.springframework.ai.chat.memory.ChatMemory;
-import org.springframework.ai.document.Document;
-import org.springframework.ai.tool.ToolCallback;
-import org.springframework.ai.tool.ToolCallbackProvider;
-import org.springframework.ai.vectorstore.VectorStore;
 
-import java.util.List;
-
+/**
+ * ReAct模式智能体（思考 → 行动）
+ * 继承BaseAgent，拆分核心逻辑：
+ * 1. think()：思考是否需要调用工具/执行下一步
+ * 2. act()：执行具体操作（调用工具/生成答案）
+ */
+@EqualsAndHashCode(callSuper = true)
+@Data
 @Slf4j
-public class ReActAgent extends BaseAgent {
+public abstract class ReActAgent extends BaseAgent {
 
-    private final ChatClient chatClient; // Spring AI 自动配置，是 Agent 的“大脑”。
-    private final ChatMemory chatMemory; // 由你写的 ChatMemoryConfig 创建，负责短期记忆。
-    //private final ToolCallbackProvider mcpToolProvider; // MCP 客户端连接成功后，Spring AI 自动创建，封装所有外部工具。
-    private final VectorStore vectorStore;  // 新增，长期记忆
-    private final ToolCallback[] toolCallbacks; // 本地工具数组
+    /**
+     * 思考方法
+     * @return true=需要执行行动，false=直接结束
+     */
+    public abstract boolean think();
 
-    public ReActAgent(ChatClient chatClient,
-                      ChatMemory chatMemory,
-                      VectorStore vectorStore,
-                      ToolCallback[] toolCallbacks
-                      ) {
-        super("智能助手小智", "一个会思考、会用工具的 AI 助手");
-        this.chatClient = chatClient;
-        this.chatMemory = chatMemory;
-        this.toolCallbacks= toolCallbacks;
-        this.vectorStore=vectorStore;
-    }
+    /**
+     * 行动方法
+     * @return 行动执行结果
+     */
+    public abstract String act();
 
+    /**
+     * 实现父类的step()方法
+     * 统一流程：先思考 → 再决定是否行动
+     */
     @Override
-    public String execute(String userInput) {
-        log("收到任务：" + userInput);
-        log("========== Agent 开始工作 ==========");
-
-        StringBuilder toolList = new StringBuilder();
-        for (ToolCallback tc : toolCallbacks) {
-            toolList.append("- ").append(tc.getToolDefinition().name())
-                    .append(": ").append(tc.getToolDefinition().description()).append("\n");
+    public String step() {
+        try {
+            // 第一步：思考
+            boolean shouldAct = think();
+            // 不需要行动：直接返回结果
+            if (!shouldAct) {
+                return "思考完成，无需执行任何操作";
+            }
+            // 需要行动：执行行动
+            return act();
+        } catch (Exception e) {
+            log.error("步骤执行失败", e);
+            return "步骤执行失败：" + e.getMessage();
         }
-
-
-        String systemPrompt = """
-            你是 %s，%s。
-
-            你可以使用以下工具：
-            %s
-
-            请按步骤工作：先理解需求 → 决定是否用工具 → 调用工具获取结果 → 整合信息给出最终答案。
-            语言：中文，简洁专业。禁止重复内容、空洞套话。输出 Markdown 格式。
-        """.formatted(agentName, agentDescription,toolList.toString());
-
-        String answer = chatClient.prompt()
-                .system(systemPrompt)
-                .user(userInput)
-                .toolCallbacks(toolCallbacks)   // 直接使用本地工具数组
-                .advisors(MessageChatMemoryAdvisor.builder(chatMemory).build())
-                .call()
-                .content();
-
-
-        String newKnowledge = """
-        用户问题：%s
-        智能助手回答：%s
-        """.formatted(userInput, answer);
-        Document newDoc = new Document(newKnowledge);
-        vectorStore.add(List.of(newDoc));
-        log("========== Agent 结束工作 ==========");
-        return answer;
     }
 }

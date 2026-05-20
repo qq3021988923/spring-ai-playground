@@ -31,26 +31,22 @@
     </dependencyManagement>
 
     <dependencies>
-        <!-- MCP Server 核心 -->
+        <!-- MCP 服务端 SSE 模式（官方唯一正确依赖） -->
         <dependency>
             <groupId>org.springframework.ai</groupId>
             <artifactId>spring-ai-starter-mcp-server-webmvc</artifactId>
         </dependency>
-
-        <!-- Hutool 工具类 -->
+        <!-- Spring Web -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-web</artifactId>
+        </dependency>
+        <!-- Hutool -->
         <dependency>
             <groupId>cn.hutool</groupId>
             <artifactId>hutool-all</artifactId>
-            <version>5.8.37</version>
+            <version>5.8.25</version>
         </dependency>
-
-        <dependency>
-            <groupId>org.projectlombok</groupId>
-            <artifactId>lombok</artifactId>
-            <optional>true</optional>
-        </dependency>
-
-
     </dependencies>
 
     <repositories>

@@ -13,6 +13,7 @@ spring:
       client:
         enabled: false  # 如果你不手动创建 ChatClient 的话可以禁用自动配置
 
+
     dashscope:
       api-key: sk-8f196f4a6a394c248c15808a619a85ee
       chat:
@@ -36,6 +37,11 @@ spring:
         index-type: HNSW
         distance-type: COSINE_DISTANCE
 
+# 直接把下面这段贴在最后！
+search:
+  api:
+    key: YSP75WjPBvEydCCZd2ftzVab
+
 springdoc:
   swagger-ui:
     path: /swagger-ui.html
@@ -54,3 +60,8 @@ knife4j:
 logging:
   level:
     org.springframework.ai: DEBUG
+
+#search:
+#  api:
+#    key: YSP75WjPBvEydCCZd2ftzVab  # 去 https://www.searchapi.io/ 免费注册
+#

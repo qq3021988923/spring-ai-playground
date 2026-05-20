@@ -113,6 +113,7 @@ public class RagService {
     public String ragChat(String userQuery) {
         // 第一步：检索相关文档
         List<Document> relevantDocs = retrieve(userQuery);
+        System.out.println("我是相关文档" + relevantDocs);
 
         // 第二步：将检索到的文档拼接成上下文
         StringBuilder context = new StringBuilder();

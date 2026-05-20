@@ -20,6 +20,13 @@ import org.springframework.web.bind.annotation.*;
 import java.util.ArrayList;
 import java.util.List;
 
+import com.yang.tools.FileConstant;
+import java.io.File;
+import java.nio.file.Files;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 /**
  * AI 聊天控制器
  * 学习第1步：使用 Spring AI 调用阿里云百炼大模型
@@ -101,7 +108,7 @@ public class AiController {
     }
 
     /**
-     * 获取结构化的恋爱建议
+     * 获取结构化的恋爱建议 结构化输出
      * 访问：http://localhost:8090/ai/love-advice?situation=我和对象吵架了
      */
     @GetMapping("/love-advice")
@@ -165,5 +172,36 @@ public class AiController {
     @Operation(summary = "查看知识库4", description = "查看当前知识库内容")
     public List<String> getKnowledgeBase() {
         return ragService.getKnowledgeBase();
+    }
+
+    // ===================== 集成：文件下载接口（直接加在这里） =====================
+    @GetMapping("/download")
+    @Operation(summary = "文件下载", description = "AI保存的文件，浏览器直接下载")
+    public ResponseEntity<?> downloadFile(@RequestParam String fileName) {
+        try {
+            String fileDir = FileConstant.FILE_SAVE_DIR + "/file";
+            String fullPath = fileDir + "/" + fileName;
+
+            // 安全校验：只允许下载tmp目录内的文件
+            if (!FileConstant.isPathInAllowedDir(fullPath)) {
+                return ResponseEntity.badRequest().body("禁止访问非法路径！");
+            }
+
+            File file = new File(fullPath);
+            if (!file.exists()) {
+                return ResponseEntity.status(HttpStatus.NOT_FOUND).body("文件不存在");
+            }
+
+            // 设置下载响应头
+            HttpHeaders headers = new HttpHeaders();
+            headers.add(HttpHeaders.CONTENT_DISPOSITION,
+                    "attachment; filename=" + new String(fileName.getBytes("UTF-8"), "ISO-8859-1"));
+            headers.setContentType(MediaType.APPLICATION_OCTET_STREAM);
+
+            byte[] data = Files.readAllBytes(file.toPath());
+            return new ResponseEntity<>(data, headers, HttpStatus.OK);
+        } catch (Exception e) {
+            return ResponseEntity.status(500).body("下载失败：" + e.getMessage());
+        }
     }
 }

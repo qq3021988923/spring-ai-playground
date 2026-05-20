@@ -54,6 +54,8 @@ public class AiService {
                 new UserMessage(userMessage)
         );
 
+        System.out.println("我是系统提示词和用户问题"+messages);
+
         ChatResponse response = chatModel.call(new Prompt(messages));
         String answer = response.getResult().getOutput().getText();
         log.info("恋爱顾问回复：{}", answer);
@@ -104,12 +106,12 @@ public class AiService {
     }
 
     public String chatWithMemory(String userId, String userMessage) {
-        List<Message> messages = chatMemory.computeIfAbsent(userId, k -> {
+            List<Message> messages = chatMemory.computeIfAbsent(userId, k -> {
             List<Message> init = new ArrayList<>();
             init.add(new SystemMessage("你是一个 helpful 的 AI 助手。"));
             return init;
         });
-
+        System.out.println("我是用户" + messages);
         messages.add(new UserMessage(userMessage));
 
         ChatResponse response = chatModel.call(new Prompt(messages));
@@ -127,7 +129,6 @@ public class AiService {
 
     public String chatWithMcp(String userMessage) {
         log.info("收到MCP消息：{}", userMessage);
-
 
         String answer = chatClientBuilder
                 .build()

@@ -1,6 +1,6 @@
 <script setup>
 import { ref, nextTick, watch } from 'vue'
-import { chat } from '../api'
+import { chat, streamManus } from '../api'
 
 const props = defineProps({
   mode: { type: String, default: 'agent' }
@@ -11,13 +11,20 @@ const messages = ref([])
 const loading = ref(false)
 const messagesRef = ref(null)
 const inputRef = ref(null)
+let currentEventSource = null
 
 const modes = {
   agent: {
     icon: '',
     name: '智能助手小智',
-    hint: '试试问：现在几点了？ / 100加200等于多少',
+    hint: '试试问：搜索Spring AI教程并保存到文件 / 下载一张图片',
     color: '#1F67FF'
+  },
+  manus: {
+    icon: '⚡',
+    name: 'YangManus 超级智能体',
+    hint: '试试问：帮我搜索Python教程，整理成报告并保存为文件 / 查询天气并生成PDF报告',
+    color: '#9C27B0'
   },
   love: {
     icon: '💕',
@@ -36,7 +43,12 @@ const modes = {
 const current = () => modes[props.mode] || modes.agent
 
 watch(() => props.mode, () => {
+  if (currentEventSource) {
+    currentEventSource.close()
+    currentEventSource = null
+  }
   messages.value = []
+  loading.value = false
 })
 
 const scrollToBottom = () => {
@@ -53,16 +65,49 @@ const sendMessage = async () => {
   loading.value = true
   scrollToBottom()
 
-  try {
-    const res = await chat({ message: userMsg, mode: props.mode })
-    messages.value.push({ role: 'assistant', content: res || '抱歉，没有收到回复' })
-  } catch (e) {
-    console.error('发送失败', e)
-    messages.value.push({ role: 'assistant', content: '网络出错了，请稍后再试' })
-  } finally {
-    loading.value = false
-    scrollToBottom()
+  if (props.mode === 'manus') {
+    sendManusStream(userMsg)
+  } else {
+    try {
+      const res = await chat({ message: userMsg, mode: props.mode })
+      messages.value.push({ role: 'assistant', content: res || '抱歉，没有收到回复' })
+    } catch (e) {
+      console.error('发送失败', e)
+      messages.value.push({ role: 'assistant', content: '网络出错了，请稍后再试' })
+    } finally {
+      loading.value = false
+      scrollToBottom()
+    }
   }
+}
+
+const sendManusStream = (userMsg) => {
+  const assistantMsg = { role: 'assistant', content: '' }
+  messages.value.push(assistantMsg)
+
+  currentEventSource = streamManus(
+    userMsg,
+    (data) => {
+      assistantMsg.content += data + '\n'
+      scrollToBottom()
+    },
+    () => {
+      loading.value = false
+      currentEventSource = null
+      scrollToBottom()
+    },
+    (e) => {
+      console.error('SSE 流失败', e)
+      if (assistantMsg.content) {
+        assistantMsg.content += '\n\n[流式传输中断]'
+      } else {
+        assistantMsg.content = 'SSE 连接失败，请稍后重试'
+      }
+      loading.value = false
+      currentEventSource = null
+      scrollToBottom()
+    }
+  )
 }
 
 const handleKeyDown = (e) => {
@@ -77,7 +122,7 @@ const handleKeyDown = (e) => {
       <span class="header-icon">{{ current().icon }}</span>
       <div class="header-info">
         <span class="header-name">{{ current().name }}</span>
-        <span class="header-desc">{{ props.mode === 'agent' ? 'ReAct Agent · 工具调用' : props.mode === 'love' ? 'RAG 检索增强 · 知识库问答' : '本地模型 · 免费· 离线 · 隐私安全' }}</span>
+        <span class="header-desc">{{ props.mode === 'agent' ? 'ReAct Agent · 工具调用' : props.mode === 'manus' ? 'think→act 多步循环 · 自主决策 · SSE 流式' : props.mode === 'love' ? 'RAG 检索增强 · 知识库问答' : '本地模型 · 免费 · 离线 · 隐私安全' }}</span>
       </div>
     </div>
 

@@ -11,6 +11,7 @@ import org.springframework.ai.document.Document;
 import org.springframework.ai.tool.ToolCallback;
 import org.springframework.ai.vectorstore.VectorStore;
 import org.springframework.stereotype.Service;
+import reactor.core.publisher.Flux;
 
 import java.util.List;
 import java.util.stream.Collectors;
@@ -64,9 +65,15 @@ public class OllamaService {
             智能助手回答：%s
             """.formatted(userMessage, answer);
         Document newDoc = new Document(newKnowledge);
+        System.out.println("存储本地会话"+newDoc);
         vectorStore.add(List.of(newDoc));
         log.info("本地 Agent 对话已存入知识库");
 
         return answer;
     }
+
+
+
+
+
 }

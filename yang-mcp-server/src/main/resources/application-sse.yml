@@ -1,0 +1,21 @@
+# SSE 模式：Web 服务模式（MCP 服务对外提供接口，供主项目调用）
+spring:
+  ai:
+    mcp:
+      server:
+        name: yang-image-search-mcp
+        version: 1.0.0
+        type: SYNC
+        # SSE 模式必须为 false，stdio 是命令行模式，和 Web 冲突
+        stdio: false
+  main:
+    # 开启 Web 服务（必须！）
+    web-application-type: servlet
+    banner-mode: off
+# 自定义端口，避免和主项目冲突
+server:
+  port: 8129
+
+# Pexels 图片搜索 API 配置（自行申请免费 KEY：https://www.pexels.com/api/）
+pexels:
+  api-key: 0XArXQ00daXFFiuL3JhSBfkSsTmWaXJuHo9DGUTDuMs61m5koa4ONoLz

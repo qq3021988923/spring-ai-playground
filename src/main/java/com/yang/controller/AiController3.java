@@ -39,7 +39,8 @@ public class AiController3 {
 
     @GetMapping("/joke")
     @Operation(summary = "纯 LangChain4j 9",
-            description = "支持临时记忆，重启后丢失，无工具/RAG/存数据库功能")
+            description = "支持临时记忆，重启后丢失，无工具/RAG/存数据库功能" +
+                    "玩具级接口")
     public String tellMeAJoke(@RequestParam(defaultValue = "default",required = false) String chatId,
                               @RequestParam String message) {
         return jokeService.tellJoke(chatId,message);

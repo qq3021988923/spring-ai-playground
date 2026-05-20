@@ -16,6 +16,10 @@ const mode = ref('agent')
           @click="mode = 'agent'"
         > Agent 模式</button>
         <button
+          :class="['tab', { active: mode === 'manus' }]"
+          @click="mode = 'manus'"
+        >⚡ 超级智能体</button>
+        <button
           :class="['tab', { active: mode === 'love' }]"
           @click="mode = 'love'"
         >💕 恋爱顾问</button>

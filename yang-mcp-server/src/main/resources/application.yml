@@ -2,4 +2,4 @@ spring:
   application:
     name: yang-mcp-server
   profiles:
-    active: stdio
+    active: sse

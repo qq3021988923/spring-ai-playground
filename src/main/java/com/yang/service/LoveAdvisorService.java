@@ -6,6 +6,7 @@ import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.document.Document;
 import org.springframework.ai.vectorstore.VectorStore;
 import org.springframework.stereotype.Service;
+import reactor.core.publisher.Flux;
 
 import java.util.List;
 
@@ -40,8 +41,8 @@ public class LoveAdvisorService {
         // PostgreSQL 和 PgVector 的关系，就像 手机 和 一个 App：
         // 1. 检索相关知识库 直接从数据库拿数据 ，意思最接近的句子 等价于调用mapper层的方法 这里
         List<Document> relatedDocs = documentLoader.search(userQuestion);
-
-        // 2. 构建上下文
+        System.out.println("检索相关知识库"+relatedDocs);
+        // 2. 构建上下文 从数据库搜索相关数据 再将数据喂给ai
         StringBuilder context = new StringBuilder();
         context.append("以下是恋爱知识库中的相关内容：\n\n");
         for (Document doc : relatedDocs) {
@@ -85,12 +86,12 @@ public class LoveAdvisorService {
         """.formatted(userQuestion, answer);
 
         Document newDoc = new Document(newKnowledge); // 格式化打包，将这条数据在数据库建立一个目录（（向量索引））
+        System.out.println("我是存储数据" + newDoc);
         vectorStore.add(List.of(newDoc));   // 存入向量库，下次可以检索到，通过目录
 
         log.info("本次对话已存入知识库");
 
         return answer;
     }
-
 
 }

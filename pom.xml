@@ -107,10 +107,7 @@
             <artifactId>spring-ai-starter-model-ollama</artifactId>
         </dependency>
 
-<!--        <dependency>
-            <groupId>org.springframework.ai</groupId>
-            <artifactId>spring-ai-starter-mcp-client</artifactId>
-        </dependency>-->
+
 
         <dependency>
             <groupId>dev.langchain4j</groupId>
@@ -144,6 +141,44 @@
             <artifactId>jsonschema-module-jackson</artifactId>
             <version>4.38.0</version>
         </dependency>
+        <!--文件读写 文件读写、字符串处理、命令执行、IO 操作等-->
+        <dependency>
+            <groupId>cn.hutool</groupId>
+            <artifactId>hutool-all</artifactId>
+            <version>5.8.37</version>
+        </dependency>
+        <!--网页抓取工具-->
+        <dependency>
+            <groupId>org.jsoup</groupId>
+            <artifactId>jsoup</artifactId>
+            <version>1.19.1</version>
+        </dependency>
+        <!-- PDF生成工具 iText9 核心依赖 -->
+   <!-- <dependency>
+            <groupId>com.itextpdf</groupId>
+            <artifactId>kernel</artifactId>
+            <version>9.1.0</version>
+        </dependency>
+        <dependency>
+            <groupId>com.itextpdf</groupId>
+            <artifactId>layout</artifactId>
+            <version>9.1.0</version>
+        </dependency>
+        <dependency>
+            <groupId>com.itextpdf</groupId>
+            <artifactId>io</artifactId>
+            <version>9.1.0</version>
+        </dependency>-->
+        <!-- Spring AI MCP 客户端（远程调用 MCP 服务） -->
+
+
+<!--
+    mcp第三方工具
+    <dependency>
+            <groupId>org.springframework.ai</groupId>
+            <artifactId>spring-ai-starter-mcp-client</artifactId>
+        </dependency>-->
+
     </dependencies>
 
     <!-- 引入 Spring AI 相对稳定的测试版-->
