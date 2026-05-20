@@ -1,31 +1,30 @@
 package com.yang.agent;
 
 import cn.hutool.core.util.StrUtil;
-import com.yang.model.AgentState;
 import lombok.Data;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.ai.chat.memory.ChatMemory;
 import org.springframework.ai.chat.messages.Message;
+import org.springframework.ai.chat.messages.SystemMessage;
 import org.springframework.ai.chat.messages.UserMessage;
-import org.springframework.http.MediaType;
+import org.springframework.ai.document.Document;
+import org.springframework.ai.vectorstore.SearchRequest;
+import org.springframework.ai.vectorstore.VectorStore;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
 /**
- * 智能体抽象基类
- * 核心能力：
- * 1. 状态机管理（IDLE/RUNNING/FINISHED/ERROR）
- * 2. 多步任务循环执行（限制最大步骤）
- * 3. 同步调用 + SSE流式调用
- * 4. 对话上下文管理
+ * 企业级智能体抽象基类（已修复所有记忆问题）
+ * 功能：状态机管理 + 同步执行 + SSE流式执行 + 上下文临时记忆 + 向量库长期记忆
  */
 @Data
 @Slf4j
 public abstract class BaseAgent {
-
     // ==================== 基础配置 ====================
     private String name;                // 智能体名称
     private String systemPrompt;        // 系统提示词（人设/规则）
@@ -33,137 +32,164 @@ public abstract class BaseAgent {
     private AgentState state = AgentState.IDLE; // 当前状态
     private int currentStep = 0;        // 当前执行到第几步
     private int maxSteps = 10;          // 最大执行步骤（防止死循环）
-
     // ==================== 核心依赖 ====================
     protected ChatClient chatClient;    // Spring AI 聊天客户端
     protected List<Message> messageList = new ArrayList<>(); // 对话上下文
+    // ==================== 企业级记忆核心 ====================
+    protected ChatMemory chatMemory;   // 短期上下文记忆（多轮对话）
+    protected VectorStore vectorStore; // 长期向量库记忆（持久化存储）
 
-    // ==================== 【核心修复】重置方法：每次调用都清空状态 ====================
-    private void reset() {
+    // ==================== 【修复】重置方法：接收外部会话ID，不再修改全局系统提示词 ====================
+    private void reset(String conversationId) {
         this.state = AgentState.IDLE;
         this.currentStep = 0;
         this.messageList.clear();
+
+        // ✅ 修复1：从ChatMemory加载历史对话（上下文记忆生效）
+        if (chatMemory != null) {
+            List<Message> history = chatMemory.get(conversationId);
+            if (!history.isEmpty()) {
+                messageList.addAll(history);
+                log.info("【{}】加载历史对话：{} 条，会话ID：{}", name, history.size(), conversationId);
+            }
+        }
+
+        // ✅ 修复2：对话前自动检索向量库的相关历史（长期记忆生效）
+        if (vectorStore != null && !messageList.isEmpty()) {
+            // 用最后一条用户消息检索相关历史，更准确
+            Message lastUserMsg = messageList.stream()
+                    .filter(m -> m instanceof UserMessage)
+                    .reduce((first, second) -> second)
+                    .orElse(null);
+
+            if (lastUserMsg != null) {
+                List<Document> relatedDocs = vectorStore.similaritySearch(
+                        SearchRequest.builder()
+                                .query(lastUserMsg.getText())
+                                .topK(3)
+                                .similarityThreshold(0.6)
+                                .build()
+                );
+
+                if (!relatedDocs.isEmpty()) {
+                    log.info("【{}】检索到相关历史对话：{} 条", name, relatedDocs.size());
+                    // 把相关历史作为上下文加到消息列表开头，不修改全局系统提示词
+                    StringBuilder historyContext = new StringBuilder("【相关历史对话参考】\n");
+                    for (Document doc : relatedDocs) {
+                        historyContext.append(doc.getText()).append("\n---\n");
+                    }
+                    messageList.add(0, new SystemMessage(historyContext.toString()));
+                }
+            }
+        }
+
         log.info("【{}】状态已重置：IDLE", name);
     }
 
-    // ==================== 同步执行（非流式） ====================
-    /**
-     * 同步运行智能体
-     * @param userPrompt 用户输入的问题
-     * @return 最终执行结果
-     */
-    public String run(String userPrompt) {
-        // 【修复】每次执行前强制重置状态，解决单例状态异常问题
-        reset();
+    // ==================== 同步执行（旧接口 /agent 调用） ====================
+    public String run(String conversationId, String userPrompt) {
+        reset(conversationId); // ✅ 接收外部传入的会话ID
 
-        // 状态校验：只有空闲状态才能执行
         if (this.state != AgentState.IDLE) {
             throw new RuntimeException("智能体状态异常，无法执行：" + this.state);
         }
-        // 参数校验：用户输入不能为空
         if (StrUtil.isBlank(userPrompt)) {
             throw new RuntimeException("用户输入不能为空");
         }
 
-        // 切换状态为运行中
         this.state = AgentState.RUNNING;
         messageList.add(new UserMessage(userPrompt));
         List<String> results = new ArrayList<>();
 
         try {
-            // 多步循环：直到完成任务 or 达到最大步骤
             for (int i = 0; i < maxSteps && state != AgentState.FINISHED; i++) {
                 currentStep = i + 1;
                 log.info("执行步骤：{}/{}", currentStep, maxSteps);
-                // 执行子类实现的具体步骤
                 String stepResult = step();
                 results.add("步骤 " + currentStep + "：" + stepResult);
             }
 
-            // 超过最大步骤，强制结束
             if (currentStep >= maxSteps) {
                 state = AgentState.FINISHED;
                 results.add("任务终止：已达到最大步骤数(" + maxSteps + ")");
             }
 
-            // 【同步接口】最后追加AI正式回答
             String finalAnswer = getFinalAnswer();
             results.add("\n--- AI 正式回答 ---\n" + finalAnswer);
+
+            // ✅ 保存对话到向量库
+            saveConversationToVectorStore(userPrompt, finalAnswer);
+            // ✅ 保存对话到ChatMemory（上下文记忆生效）
+            if (chatMemory != null) {
+                chatMemory.add(conversationId, new UserMessage(userPrompt));
+                chatMemory.add(conversationId, new org.springframework.ai.chat.messages.AssistantMessage(finalAnswer));
+            }
+
             return String.join("\n", results);
         } catch (Exception e) {
-            // 异常处理
             state = AgentState.ERROR;
             log.error("智能体执行异常", e);
             return "执行错误：" + e.getMessage();
         } finally {
-            // 执行完成/异常，清理资源
             this.cleanup();
         }
     }
 
-    // ==================== 流式执行（SSE前端实时输出） ====================
-    /**
-     * SSE流式运行智能体
-     * 作用：前端实时接收每一步的执行结果（类似ChatGPT流式打字）
-     * @param userPrompt 用户问题
-     * @return SseEmitter 流式响应对象
-     */
-    public SseEmitter runStream(String userPrompt) {
-        // 【修复】每次执行前强制重置状态，解决单例状态异常问题
-        reset();
+    // ==================== 流式执行（新接口 /manus/stream 调用） ====================
+    public SseEmitter runStream(String conversationId, String userPrompt) {
+        reset(conversationId); // ✅ 接收外部传入的会话ID
 
-        // 创建SSE对象，超时时间5分钟
         SseEmitter sseEmitter = new SseEmitter(300000L);
-
-        // 异步执行（防止阻塞主线程）
         CompletableFuture.runAsync(() -> {
             try {
-                // 基础校验
                 if (this.state != AgentState.IDLE) {
-                    sseEmitter.send("错误：智能体状态异常：" + this.state, MediaType.TEXT_EVENT_STREAM);
+                    sseEmitter.send("错误：智能体状态异常：" + this.state);
                     sseEmitter.complete();
                     return;
                 }
                 if (StrUtil.isBlank(userPrompt)) {
-                    sseEmitter.send("错误：用户输入不能为空", MediaType.TEXT_EVENT_STREAM);
+                    sseEmitter.send("错误：用户输入不能为空");
                     sseEmitter.complete();
                     return;
                 }
 
-                // 开始执行
                 this.state = AgentState.RUNNING;
                 messageList.add(new UserMessage(userPrompt));
+                String finalAnswer = "";
 
-                // 多步循环执行
                 for (int i = 0; i < maxSteps && state != AgentState.FINISHED; i++) {
                     currentStep = i + 1;
                     log.info("执行步骤：{}/{}", currentStep, maxSteps);
                     String stepResult = step();
-                    // 实时发送步骤结果到前端，指定MediaType解决乱码
-                    sseEmitter.send("Step " + currentStep + "：" + stepResult, MediaType.TEXT_EVENT_STREAM);
+                    sseEmitter.send("Step " + currentStep + "：" + stepResult);
+                    finalAnswer = stepResult;
                 }
 
-                // 结束提示
                 if (currentStep >= maxSteps) {
                     state = AgentState.FINISHED;
-                    sseEmitter.send("执行结束：达到最大步骤数", MediaType.TEXT_EVENT_STREAM);
+                    sseEmitter.send("执行结束：达到最大步骤数");
                 }
 
-                // ====================== 核心新增：步骤执行完，发送AI正式回答 ======================
-                sseEmitter.send("\n========================================", MediaType.TEXT_EVENT_STREAM);
-                sseEmitter.send("AI 正式回答：", MediaType.TEXT_EVENT_STREAM);
-                String finalAnswer = getFinalAnswer();
-                sseEmitter.send(finalAnswer, MediaType.TEXT_EVENT_STREAM);
-                sseEmitter.send("========================================\n", MediaType.TEXT_EVENT_STREAM);
+                sseEmitter.send("\n========================================");
+                sseEmitter.send("AI 正式回答：");
+                finalAnswer = getFinalAnswer();
+                sseEmitter.send(finalAnswer);
+                sseEmitter.send("========================================\n");
+
+                // ✅ 保存对话到向量库
+                saveConversationToVectorStore(userPrompt, finalAnswer);
+                // ✅ 保存对话到ChatMemory（上下文记忆生效）
+                if (chatMemory != null) {
+                    chatMemory.add(conversationId, new UserMessage(userPrompt));
+                    chatMemory.add(conversationId, new org.springframework.ai.chat.messages.AssistantMessage(finalAnswer));
+                }
 
                 sseEmitter.complete();
-
             } catch (Exception e) {
-                // 异常处理
                 state = AgentState.ERROR;
                 log.error("流式执行异常", e);
                 try {
-                    sseEmitter.send("执行错误：" + e.getMessage(), MediaType.TEXT_EVENT_STREAM);
+                    sseEmitter.send("执行错误：" + e.getMessage());
                     sseEmitter.complete();
                 } catch (Exception ex) {
                     sseEmitter.completeWithError(ex);
@@ -173,7 +199,6 @@ public abstract class BaseAgent {
             }
         });
 
-        // SSE连接超时/完成的回调
         sseEmitter.onTimeout(() -> {
             this.state = AgentState.ERROR;
             this.cleanup();
@@ -186,14 +211,11 @@ public abstract class BaseAgent {
             cleanup();
             log.info("SSE连接正常关闭");
         });
-
         return sseEmitter;
     }
-
     // ==================== 通用方法：获取AI最终正式回答 ====================
     private String getFinalAnswer() {
         try {
-            // 核心：直接取对话历史里的干净回答，不让AI重新编答案
             return chatClient.prompt()
                     .system(systemPrompt)
                     .messages(messageList)
@@ -208,18 +230,35 @@ public abstract class BaseAgent {
         }
     }
 
+    // ==================== 向量库存储（长期记忆 - 企业级核心） ====================
+    protected void saveConversationToVectorStore(String userQuestion, String agentAnswer) {
+        if (vectorStore == null) {
+            log.debug("向量库未配置，跳过长期记忆存储");
+            return;
+        }
+
+        try {
+            String content = "用户问题：" + userQuestion + "\nAI回答：" + agentAnswer;
+            Document document = new Document(content);
+            vectorStore.add(List.of(document));
+            log.info("✅ 【{}】对话已保存至向量库（长期记忆生效）", name);
+        } catch (Exception e) {
+            log.error("❌ 【{}】向量库存储失败", name, e);
+        }
+    }
+
     // ==================== 抽象方法 ====================
-    /**
-     * 抽象步骤方法
-     * 子类必须实现：每一步具体要做什么
-     */
     public abstract String step();
 
-    /**
-     * 清理方法
-     * 子类可重写：执行完成后清理资源
-     */
     protected void cleanup() {
         // 默认空实现
+    }
+
+    // ==================== 状态枚举 ====================
+    public enum AgentState {
+        IDLE,     // 空闲状态（初始状态，可接收新任务）
+        RUNNING,  // 运行中（正在执行多步任务）
+        FINISHED, // 执行完成（任务正常结束）
+        ERROR     // 执行异常（任务出错）
     }
 }

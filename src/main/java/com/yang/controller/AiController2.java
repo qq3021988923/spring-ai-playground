@@ -60,19 +60,24 @@ public class AiController2 {
         return loveAdvisorService.chat(question);
     }
 
-    // 原有旧Agent接口（保留）
+    // 原有旧Agent接口（保留，添加userId参数）
     @GetMapping("/agent")
     @Operation(summary = "有记忆 能自主规划，调用工具 8", description = "ReAct Agent + MCP 工具")
-    public String agentChat(@RequestParam String input) {
-        return reActAgent.run(input);
+    public String agentChat(
+            @RequestParam(defaultValue = "user001") String userId,
+            @RequestParam String input) {
+        // ✅ 用userId作为会话ID，不同用户上下文完全隔离
+        return reActAgent.run(userId, input);
     }
 
     // ===================== ✅ 修复完成：可直接运行的SSE流式接口 =====================
     @GetMapping(value = "/manus/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     @Operation(summary = "SSE流式调用YangManus超级智能体 9")
-    public SseEmitter doChatWithManus(@RequestParam String message) {
-        // 直接调用YangManus的流式方法，100%基于你现有代码
-        return yangManus.runStream(message);
+    public SseEmitter doChatWithManus(
+            @RequestParam(defaultValue = "user001") String userId,
+            @RequestParam String message) {
+        // ✅ 用userId作为会话ID，不同用户上下文完全隔离
+        return yangManus.runStream(userId, message);
     }
 
 //    @GetMapping("/love/reload")
@@ -84,9 +89,9 @@ public class AiController2 {
 
     @PostMapping("/chat")
     @Operation(summary = "通用聊天接口8", description = "前端调用的聊天接口")
-    public String chat(@RequestBody ChatRequest request) {
+    public String chat(@RequestBody ChatRequest request,@RequestParam(defaultValue = "user001") String userId) {
         if ("agent".equals(request.getMode())) {
-            return reActAgent.run(request.getMessage());
+            return reActAgent.run(request.getMessage(),userId);
         } else if ("love".equals(request.getMode())) {
             return loveAdvisorService.chat(request.getMessage());
         } else if ("ollama".equals(request.getMode())) {

@@ -1,24 +1,37 @@
+
 package com.yang.agent;
 
 import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.ai.chat.memory.ChatMemory;
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.tool.ToolCallback;
+import org.springframework.ai.vectorstore.VectorStore;
 import org.springframework.stereotype.Component;
 
 /**
- * 超级智能体 YangManus（使用你自己的提示词！）
+ * 超级智能体 YangManus（完全还原你原来的提示词）
+ * 功能：流式输出 + 上下文记忆 + 向量库存储 + 工具调用 + 多步思考
  */
 @Component
 public class YangManus extends ToolCallAgent {
 
-    public YangManus(ToolCallback[] allTools, ChatModel dashscopeChatModel) {
+    public YangManus(ToolCallback[] allTools,
+                     ChatModel dashscopeChatModel,
+                     ChatMemory chatMemory,
+                     VectorStore vectorStore) {
         super(allTools);
-
+        // 基础配置
         this.setName("YangManus");
         this.setMaxSteps(20);
+        // ✅ 注入上下文记忆（多轮对话）
+        this.setChatMemory(chatMemory);
+        // ✅ 注入向量库（长期存储）
+        this.setVectorStore(vectorStore);
+        // 绑定大模型
+        this.setChatClient(ChatClient.builder(dashscopeChatModel).build());
 
         // ==============================================
-        // 这里！！！直接放你自己的提示词！！！
+        // 完全还原你原来的提示词！！！
         // ==============================================
         String agentName = "超级智能助手 小羊~";
         String agentDescription = "专业、严谨、守规则、能调用工具、能联网查询";
@@ -42,7 +55,6 @@ public class YangManus extends ToolCallAgent {
         // 设置你的系统提示词
         this.setSystemPrompt(systemPrompt);
 
-
         this.setNextStepPrompt("""
 1. 用户闲聊、自我介绍、询问能力等**无需调用工具的问题，立刻调用 doTerminate 结束，禁止反复思考！**
 2. **年份、时间、政策、新闻、数据、实时信息类问题，强制必须调用联网搜索工具，禁止直接回答！**
@@ -50,8 +62,5 @@ public class YangManus extends ToolCallAgent {
 4. 工具执行完成后，必须调用 doTerminate 结束
 5. 绝对禁止无限循环、反复确认规则、重复话术！！
 """);
-
-        // 绑定大模型
-        this.setChatClient(ChatClient.builder(dashscopeChatModel).build());
     }
 }

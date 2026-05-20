@@ -13,6 +13,13 @@ const messagesRef = ref(null)
 const inputRef = ref(null)
 let currentEventSource = null
 
+// 🔥 新增：定义 userId（可从 localStorage 持久化，避免刷新丢失）
+const userId = ref(localStorage.getItem('chatUserId') || 'user001')
+// 可选：持久化 userId 到本地存储
+watch(userId, (newVal) => {
+  localStorage.setItem('chatUserId', newVal)
+})
+
 const modes = {
   agent: {
     icon: '',
@@ -69,7 +76,8 @@ const sendMessage = async () => {
     sendManusStream(userMsg)
   } else {
     try {
-      const res = await chat({ message: userMsg, mode: props.mode })
+      // 🔥 新增：调用 chat 时传入 userId
+      const res = await chat({ message: userMsg, mode: props.mode }, userId.value)
       messages.value.push({ role: 'assistant', content: res || '抱歉，没有收到回复' })
     } catch (e) {
       console.error('发送失败', e)
@@ -85,28 +93,30 @@ const sendManusStream = (userMsg) => {
   const assistantMsg = { role: 'assistant', content: '' }
   messages.value.push(assistantMsg)
 
+  // 🔥 新增：调用 streamManus 时传入 userId
   currentEventSource = streamManus(
-    userMsg,
-    (data) => {
-      assistantMsg.content += data + '\n'
-      scrollToBottom()
-    },
-    () => {
-      loading.value = false
-      currentEventSource = null
-      scrollToBottom()
-    },
-    (e) => {
-      console.error('SSE 流失败', e)
-      if (assistantMsg.content) {
-        assistantMsg.content += '\n\n[流式传输中断]'
-      } else {
-        assistantMsg.content = 'SSE 连接失败，请稍后重试'
+      userMsg,
+      userId.value, // 传入 userId 参数
+      (data) => {
+        assistantMsg.content += data + '\n'
+        scrollToBottom()
+      },
+      () => {
+        loading.value = false
+        currentEventSource = null
+        scrollToBottom()
+      },
+      (e) => {
+        console.error('SSE 流失败', e)
+        if (assistantMsg.content) {
+          assistantMsg.content += '\n\n[流式传输中断]'
+        } else {
+          assistantMsg.content = 'SSE 连接失败，请稍后重试'
+        }
+        loading.value = false
+        currentEventSource = null
+        scrollToBottom()
       }
-      loading.value = false
-      currentEventSource = null
-      scrollToBottom()
-    }
   )
 }
 
@@ -114,6 +124,7 @@ const handleKeyDown = (e) => {
   if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage() }
 }
 </script>
+
 
 <template>
   <div class="chat-container">
