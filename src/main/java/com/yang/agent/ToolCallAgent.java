@@ -82,7 +82,7 @@ public abstract class ToolCallAgent extends ReActAgent {
         }
     }
 
-    // ==================== 实现行动逻辑（执行工具，完全还原你原来的代码） ====================
+    // ==================== 实现行动逻辑（执行工具，只打日志不返回给前端） ====================
     @Override
     public String act() {
         if (!toolCallChatResponse.hasToolCalls()) {
@@ -90,30 +90,33 @@ public abstract class ToolCallAgent extends ReActAgent {
                     .filter(m -> m instanceof AssistantMessage)
                     .reduce((first, second) -> second)
                     .orElse(null);
-            return lastAiMsg != null ? lastAiMsg.getText().replaceAll("\\{.*?\\}", "").replace("doTerminate","").trim() : "暂无回答";
+            // ✅ 只有最终回答才返回给前端
+            return lastAiMsg != null ? lastAiMsg.getText()
+                    .replaceAll("\\{.*?\\}", "")
+                    .replace("doTerminate","")
+                    .replace("根据常识可知","⚠️ 无法联网，严格遵守规则不编造答案！")
+                    .trim() : "暂无回答";
         }
         try {
             // 执行工具调用
             Prompt prompt = new Prompt(getMessageList(), this.chatOptions);
             ToolExecutionResult result = toolCallingManager.executeToolCalls(prompt, toolCallChatResponse);
             setMessageList(result.conversationHistory());
-            // 兼容所有Java版本，获取最后一条消息
-            List<Message> messages = getMessageList();
-            ToolResponseMessage toolResponse = (ToolResponseMessage) messages.get(messages.size() - 1);
+
+            // ✅ 工具结果只打后台日志，绝对不返回给前端
+            ToolResponseMessage toolResponse = (ToolResponseMessage) getMessageList().get(getMessageList().size() - 1);
+            log.info("【{}】工具执行结果：{}", getName(), toolResponse.getResponses());
+
             boolean isTerminate = toolResponse.getResponses().stream()
                     .anyMatch(res -> "doTerminate".equals(res.name()));
-            // 格式化工具返回结果
-            String toolResultStr = toolResponse.getResponses().stream()
-                    .map(res -> "工具【" + res.name() + "】结果：" + res.responseData())
-                    .collect(Collectors.joining("\n"));
-            // 结束任务：返回干净文本，彻底过滤所有脏内容
+
+            // ✅ 任务结束：返回干净的最终回答
             if (isTerminate) {
                 setState(AgentState.FINISHED);
                 AssistantMessage lastAiMsg = (AssistantMessage) getMessageList().stream()
                         .filter(m -> m instanceof AssistantMessage)
                         .reduce((first, second) -> second)
                         .orElse(null);
-                // 核心：过滤JSON + doTerminate + 所有违规编答案的内容
                 String cleanAnswer = lastAiMsg != null ?
                         lastAiMsg.getText()
                                 .replaceAll("\\{.*?\\}", "")
@@ -123,7 +126,9 @@ public abstract class ToolCallAgent extends ReActAgent {
                         : "任务已完成";
                 return cleanAnswer;
             }
-            return toolResultStr;
+
+            // ✅ 工具执行完成，继续下一步思考，返回空（前端看不到任何内容）
+            return "";
         } catch (Exception e) {
             log.error("工具执行异常", e);
             setState(AgentState.FINISHED);

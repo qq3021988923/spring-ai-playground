@@ -93,13 +93,15 @@ const sendManusStream = (userMsg) => {
   const assistantMsg = { role: 'assistant', content: '' }
   messages.value.push(assistantMsg)
 
-  // 🔥 新增：调用 streamManus 时传入 userId
   currentEventSource = streamManus(
       userMsg,
-      userId.value, // 传入 userId 参数
+      userId.value,
       (data) => {
-        assistantMsg.content += data + '\n'
-        scrollToBottom()
+        // ✅ 过滤空内容和技术细节，只追加有效回答
+        if (data && data.trim() && !data.startsWith('Step') && !data.includes('工具【')) {
+          assistantMsg.content += data
+          scrollToBottom()
+        }
       },
       () => {
         loading.value = false
@@ -108,18 +110,13 @@ const sendManusStream = (userMsg) => {
       },
       (e) => {
         console.error('SSE 流失败', e)
-        if (assistantMsg.content) {
-          assistantMsg.content += '\n\n[流式传输中断]'
-        } else {
-          assistantMsg.content = 'SSE 连接失败，请稍后重试'
-        }
+        assistantMsg.content = '网络出错了，请稍后再试'
         loading.value = false
         currentEventSource = null
         scrollToBottom()
       }
   )
 }
-
 const handleKeyDown = (e) => {
   if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage() }
 }

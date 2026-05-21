@@ -17,7 +17,7 @@ public class Application {
 stop 之后 可以使用 docker-compose start 启动
 停止 docker-compose stop
 进入docker里面的数据库
-       docker exec -it yu-ai-pgvector psql -U postgres -d yu_ai_db
+           docker exec -it yu-ai-pgvector psql -U postgres -d yu_ai_db
         select count(*) from vector_store;
 
         // 本地模型启动命令 ollama serve

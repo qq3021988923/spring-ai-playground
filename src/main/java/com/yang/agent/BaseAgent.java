@@ -54,35 +54,6 @@ public abstract class BaseAgent {
             }
         }
 
-        // ✅ 修复2：对话前自动检索向量库的相关历史（长期记忆生效）
-        if (vectorStore != null && !messageList.isEmpty()) {
-            // 用最后一条用户消息检索相关历史，更准确
-            Message lastUserMsg = messageList.stream()
-                    .filter(m -> m instanceof UserMessage)
-                    .reduce((first, second) -> second)
-                    .orElse(null);
-
-            if (lastUserMsg != null) {
-                List<Document> relatedDocs = vectorStore.similaritySearch(
-                        SearchRequest.builder()
-                                .query(lastUserMsg.getText())
-                                .topK(3)
-                                .similarityThreshold(0.6)
-                                .build()
-                );
-
-                if (!relatedDocs.isEmpty()) {
-                    log.info("【{}】检索到相关历史对话：{} 条", name, relatedDocs.size());
-                    // 把相关历史作为上下文加到消息列表开头，不修改全局系统提示词
-                    StringBuilder historyContext = new StringBuilder("【相关历史对话参考】\n");
-                    for (Document doc : relatedDocs) {
-                        historyContext.append(doc.getText()).append("\n---\n");
-                    }
-                    messageList.add(0, new SystemMessage(historyContext.toString()));
-                }
-            }
-        }
-
         log.info("【{}】状态已重置：IDLE", name);
     }
 
@@ -137,7 +108,7 @@ public abstract class BaseAgent {
 
     // ==================== 流式执行（新接口 /manus/stream 调用） ====================
     public SseEmitter runStream(String conversationId, String userPrompt) {
-        reset(conversationId); // ✅ 接收外部传入的会话ID
+        reset(conversationId);
 
         SseEmitter sseEmitter = new SseEmitter(300000L);
         CompletableFuture.runAsync(() -> {
@@ -157,28 +128,27 @@ public abstract class BaseAgent {
                 messageList.add(new UserMessage(userPrompt));
                 String finalAnswer = "";
 
+                // ✅ 所有步骤只在后台执行，前端看不到任何中间过程
                 for (int i = 0; i < maxSteps && state != AgentState.FINISHED; i++) {
                     currentStep = i + 1;
                     log.info("执行步骤：{}/{}", currentStep, maxSteps);
                     String stepResult = step();
-                    sseEmitter.send("Step " + currentStep + "：" + stepResult);
-                    finalAnswer = stepResult;
+                    // ✅ 只有非空的最终回答才发给前端
+                    if (StrUtil.isNotBlank(stepResult) && state == AgentState.FINISHED) {
+                        finalAnswer = stepResult;
+                    }
                 }
 
                 if (currentStep >= maxSteps) {
                     state = AgentState.FINISHED;
-                    sseEmitter.send("执行结束：达到最大步骤数");
+                    finalAnswer = "任务终止：已达到最大步骤数(" + maxSteps + ")";
                 }
 
-                sseEmitter.send("\n========================================");
-                sseEmitter.send("AI 正式回答：");
-                finalAnswer = getFinalAnswer();
+                // ✅ 只给前端发最终的干净回答，没有任何技术细节
                 sseEmitter.send(finalAnswer);
-                sseEmitter.send("========================================\n");
 
-                // ✅ 保存对话到向量库
+                // 保存对话到数据库
                 saveConversationToVectorStore(userPrompt, finalAnswer);
-                // ✅ 保存对话到ChatMemory（上下文记忆生效）
                 if (chatMemory != null) {
                     chatMemory.add(conversationId, new UserMessage(userPrompt));
                     chatMemory.add(conversationId, new org.springframework.ai.chat.messages.AssistantMessage(finalAnswer));
@@ -221,8 +191,12 @@ public abstract class BaseAgent {
                     .messages(messageList)
                     .call()
                     .content()
-                    .replaceAll("\\{.*?\\}", "")
-                    .replace("doTerminate","")
+                    .replaceAll("\\{.*?}", "1")
+                    .replaceAll("无需调用工具.*?终止交互", "2")
+                    .replaceAll("已确认规则.*?无需调用工具", "3")
+                    .replaceAll("任务完成，立即终止交互", "4")
+                    .replaceAll("根据常识可知", "5")
+                    .replace("doTerminate","6")
                     .trim();
         } catch (Exception e) {
             log.error("生成最终回答异常", e);
