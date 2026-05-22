@@ -13,8 +13,7 @@ import org.springframework.context.annotation.Primary;
 
 @Configuration
 public class AgentConfig {
-
-    // ===================== 【你原来的全部代码，完整保留，一行不动】 =====================
+    // Spring 配置类   集中管理 Bean 注册
     @Bean
     public ChatClient.Builder dashscopeChatClientBuilder(@Qualifier("dashscopeChatModel") ChatModel chatModel) {
         return ChatClient.builder(chatModel);
@@ -36,13 +35,12 @@ public class AgentConfig {
         return ChatClient.builder(chatModel).build();
     }
 
-    // ===================== 【唯一修改：只修复这个Bean的参数，从2个 → 4个】 =====================
     @Bean
     public YangManus yangManus(
-            ToolCallback[] toolCallbacks,
-            @Qualifier("dashscopeChatModel") ChatModel chatModel,
-            ChatMemory chatMemory,
-            VectorStore vectorStore
+            ToolCallback[] toolCallbacks, //   所有工具
+            @Qualifier("dashscopeChatModel") ChatModel chatModel,  // 明确指定用阿里云百炼，不用 Ollama
+            ChatMemory chatMemory, // 上下文记忆
+            VectorStore vectorStore // 向量库
     ) {
         return new YangManus(toolCallbacks, chatModel, chatMemory, vectorStore);
     }

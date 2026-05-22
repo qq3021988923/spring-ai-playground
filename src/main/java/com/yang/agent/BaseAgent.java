@@ -31,7 +31,7 @@ public abstract class BaseAgent {
     private String nextStepPrompt;      // 下一步执行提示词
     private AgentState state = AgentState.IDLE; // 当前状态
     private int currentStep = 0;        // 当前执行到第几步
-    private int maxSteps = 10;          // 最大执行步骤（防止死循环）
+    private int maxSteps = 5;          // 最大执行步骤（防止死循环）
     // ==================== 核心依赖 ====================
     protected ChatClient chatClient;    // Spring AI 聊天客户端
     protected List<Message> messageList = new ArrayList<>(); // 对话上下文
@@ -59,7 +59,7 @@ public abstract class BaseAgent {
 
     // ==================== 同步执行（旧接口 /agent 调用） ====================
     public String run(String conversationId, String userPrompt) {
-        reset(conversationId); // ✅ 接收外部传入的会话ID
+        reset(conversationId); //   接收外部传入的会话ID
 
         if (this.state != AgentState.IDLE) {
             throw new RuntimeException("智能体状态异常，无法执行：" + this.state);
@@ -106,16 +106,18 @@ public abstract class BaseAgent {
         }
     }
 
-    // ==================== 流式执行（新接口 /manus/stream 调用） ====================
+    //  核心：流式执行入口
     public SseEmitter runStream(String conversationId, String userPrompt) {
-        reset(conversationId);
+        reset(conversationId); //   先加载历史对话
 
-        SseEmitter sseEmitter = new SseEmitter(300000L);
+        SseEmitter sseEmitter = new SseEmitter(300000L); // 5分钟超时
+
+        //  异步执行，不阻塞主线程
         CompletableFuture.runAsync(() -> {
             try {
                 if (this.state != AgentState.IDLE) {
                     sseEmitter.send("错误：智能体状态异常：" + this.state);
-                    sseEmitter.complete();
+                    sseEmitter.complete(); // 作用：结束流式输出，接口调用完成
                     return;
                 }
                 if (StrUtil.isBlank(userPrompt)) {
@@ -125,15 +127,18 @@ public abstract class BaseAgent {
                 }
 
                 this.state = AgentState.RUNNING;
+
+                // 把你发的消息，加入 AI 的对话上下文
                 messageList.add(new UserMessage(userPrompt));
                 String finalAnswer = "";
 
-                // ✅ 所有步骤只在后台执行，前端看不到任何中间过程
+                //  控制 AI 最多思考 5 次，防止死循环
+                //  多步循环：think() → act()
                 for (int i = 0; i < maxSteps && state != AgentState.FINISHED; i++) {
                     currentStep = i + 1;
                     log.info("执行步骤：{}/{}", currentStep, maxSteps);
                     String stepResult = step();
-                    // ✅ 只有非空的最终回答才发给前端
+                    //   只有非空的最终回答才发给前端
                     if (StrUtil.isNotBlank(stepResult) && state == AgentState.FINISHED) {
                         finalAnswer = stepResult;
                     }
@@ -144,7 +149,7 @@ public abstract class BaseAgent {
                     finalAnswer = "任务终止：已达到最大步骤数(" + maxSteps + ")";
                 }
 
-                // ✅ 只给前端发最终的干净回答，没有任何技术细节
+                //   只给前端发最终的干净回答，没有任何技术细节
                 sseEmitter.send(finalAnswer);
 
                 // 保存对话到数据库

@@ -11,7 +11,7 @@ import org.springframework.context.annotation.Configuration;
 @Configuration
 public class ToolConfig {
 
-
+    // 工具注册 自动扫描 `@Tool` 注解的方法，注册成 `ToolCallback[]`
     @Bean
     public ToolCallback[] toolCallbacks(
                                        KnowledgeTools knowledgeTools,

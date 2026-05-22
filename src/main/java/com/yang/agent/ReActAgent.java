@@ -16,20 +16,20 @@ import lombok.extern.slf4j.Slf4j;
 public abstract class ReActAgent extends BaseAgent {
 
     /**
-     * 思考方法
+     *    思考：是否需要调用工具
      * @return true=需要执行行动，false=直接结束
      */
     public abstract boolean think();
 
     /**
-     * 行动方法
+     *  // 行动：执行具体操作
      * @return 行动执行结果
      */
     public abstract String act();
 
     /**
-     * 实现父类的step()方法
-     * 统一流程：先思考 → 再决定是否行动
+     *   统一先 `think()`（思考）和 再决定是否 `act()`（行动）
+     *   先思考 → 再决定是否行动
      */
     @Override
     public String step() {
