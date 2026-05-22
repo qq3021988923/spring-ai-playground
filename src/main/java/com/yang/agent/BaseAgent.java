@@ -59,7 +59,7 @@ public abstract class BaseAgent {
 
     // ==================== 同步执行（旧接口 /agent 调用） ====================
     public String run(String conversationId, String userPrompt) {
-        reset(conversationId); //   接收外部传入的会话ID
+        reset(conversationId);
 
         if (this.state != AgentState.IDLE) {
             throw new RuntimeException("智能体状态异常，无法执行：" + this.state);
@@ -70,33 +70,37 @@ public abstract class BaseAgent {
 
         this.state = AgentState.RUNNING;
         messageList.add(new UserMessage(userPrompt));
-        List<String> results = new ArrayList<>();
+        String finalStepResult = "";
 
         try {
             for (int i = 0; i < maxSteps && state != AgentState.FINISHED; i++) {
                 currentStep = i + 1;
                 log.info("执行步骤：{}/{}", currentStep, maxSteps);
                 String stepResult = step();
-                results.add("步骤 " + currentStep + "：" + stepResult);
+
+                // ✅ 只保留任务完成时的有效回答，中间步骤的空结果不记录
+                if (StrUtil.isNotBlank(stepResult) && state == AgentState.FINISHED) {
+                    finalStepResult = stepResult;
+                }
             }
 
             if (currentStep >= maxSteps) {
                 state = AgentState.FINISHED;
-                results.add("任务终止：已达到最大步骤数(" + maxSteps + ")");
+                finalStepResult = "任务终止：已达到最大步骤数(" + maxSteps + ")";
             }
 
-            String finalAnswer = getFinalAnswer();
-            results.add("\n--- AI 正式回答 ---\n" + finalAnswer);
+            // ✅ 不再额外调用getFinalAnswer，直接用step()返回的最终结果
+            String finalAnswer = finalStepResult;
 
-            // ✅ 保存对话到向量库
+            // ✅ 保存对话到向量库和ChatMemory
             saveConversationToVectorStore(userPrompt, finalAnswer);
-            // ✅ 保存对话到ChatMemory（上下文记忆生效）
             if (chatMemory != null) {
                 chatMemory.add(conversationId, new UserMessage(userPrompt));
                 chatMemory.add(conversationId, new org.springframework.ai.chat.messages.AssistantMessage(finalAnswer));
             }
 
-            return String.join("\n", results);
+            // ✅ 只返回干净的最终回答，不返回步骤日志
+            return finalAnswer;
         } catch (Exception e) {
             state = AgentState.ERROR;
             log.error("智能体执行异常", e);
@@ -105,7 +109,6 @@ public abstract class BaseAgent {
             this.cleanup();
         }
     }
-
     //  核心：流式执行入口
     public SseEmitter runStream(String conversationId, String userPrompt) {
         reset(conversationId); //   先加载历史对话

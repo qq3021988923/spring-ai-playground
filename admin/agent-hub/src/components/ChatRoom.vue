@@ -29,7 +29,7 @@ const modes = {
   },
   manus: {
     icon: '⚡',
-    name: 'YangManus 超级智能体',
+    name: '小杨~ 超级智能体',
     hint: '试试问：帮我搜索Python教程，整理成报告并保存为文件 / 查询天气并生成PDF报告',
     color: '#9C27B0'
   },
