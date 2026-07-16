@@ -1,6 +1,6 @@
 <script setup>
 import { ref, nextTick, watch } from 'vue'
-import { chat, streamManus } from '../api'
+import { chat, streamManus,streamLove } from '../api'
 
 const props = defineProps({
   mode: { type: String, default: 'agent' }
@@ -74,6 +74,8 @@ const sendMessage = async () => {
 
   if (props.mode === 'manus') {
     sendManusStream(userMsg)
+  }else if (props.mode === 'love') {
+    sendLoveStream(userMsg)           // ← 新增这个分支
   } else {
     try {
       // 🔥 新增：调用 chat 时传入 userId
@@ -117,6 +119,26 @@ const sendManusStream = (userMsg) => {
       }
   )
 }
+
+const sendLoveStream = (userMsg) => {
+  const aiMsgIndex = messages.value.length
+  messages.value.push({ role: 'assistant', content: '' })
+
+  currentEventSource = streamLove(userMsg, userId.value)
+
+  currentEventSource.onmessage = (event) => {
+    messages.value[aiMsgIndex].content += event.data   // ← 必须通过 messages.value 改，Vue 才能追踪
+    scrollToBottom()
+  }
+
+  currentEventSource.onerror = () => {
+    currentEventSource.close()
+    loading.value = false
+    currentEventSource = null
+    scrollToBottom()
+  }
+}
+
 const handleKeyDown = (e) => {
   if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage() }
 }

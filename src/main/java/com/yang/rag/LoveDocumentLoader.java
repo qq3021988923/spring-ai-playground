@@ -15,7 +15,6 @@ import java.util.stream.Collectors;
 
 /**
  * 恋爱知识库加载器
- * 模仿鱼皮项目的 LoveApp
  */
 @Slf4j
 @Component

@@ -33,7 +33,7 @@ public class RagService {
     private final List<Document> documentChunks = new ArrayList<>();
 
     /**
-     * 项目启动时，加载一些模拟的知识库
+     * 项目启动时，自动加载这个方法 加载一些模拟的知识库
      */
     @PostConstruct
     public void initKnowledgeBase() {

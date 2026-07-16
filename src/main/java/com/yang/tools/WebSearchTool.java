@@ -19,9 +19,12 @@ import java.util.stream.Collectors;
  */
 @Component
 public class WebSearchTool {
-    // https://www.searchapi.io/ 在这里拿取密钥 有请求次数
-    // 帮我搜索 2026年人工智能发展趋势
-    private static final String SEARCH_API_URL = "https://www.searchapi.io/api/v1/search";
+
+    // 帮我搜索 2026年人工智能发展趋势 https://serpapi.com/ 搜索这个才能进入官网
+  //  private static final String SEARCH_API_URL = "https://serpapi.com/search";
+
+    @Value("${search.api.hello:}")
+    private String searchApiUrl;
 
     // 从配置文件读取 apiKey（你也可以直接写死）
     @Value("${search.api.key:}")
@@ -42,7 +45,7 @@ public class WebSearchTool {
         paramMap.put("engine", "baidu");
 
         try {
-            String response = HttpUtil.get(SEARCH_API_URL, paramMap);
+            String response = HttpUtil.get(searchApiUrl, paramMap);
             JSONObject jsonObject = JSONUtil.parseObj(response);
             JSONArray organicResults = jsonObject.getJSONArray("organic_results");
 

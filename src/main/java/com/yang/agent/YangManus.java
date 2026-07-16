@@ -16,15 +16,15 @@ import org.springframework.stereotype.Component;
 public class YangManus extends ToolCallAgent {
 
 
-
+    // 只要调用这个类 就会优先执行这个方法  构造方法
     public YangManus(ToolCallback[] allTools,
                      ChatModel dashscopeChatModel,
                      ChatMemory chatMemory,
                      VectorStore vectorStore) {
         super(allTools);
         // 基础配置
-        this.setName("YangManus");
-        this.setMaxSteps(10);
+        this.setName("咩~");
+        this.setMaxSteps(7);
         // ✅ 注入上下文记忆（多轮对话）
         this.setChatMemory(chatMemory);
         // ✅ 注入向量库（长期存储）
@@ -52,18 +52,11 @@ public class YangManus extends ToolCallAgent {
    - 纯闲聊、问候、日常对话：正常温柔回应，禁止输出任何规则文本、禁止终止交互。
 9. 所有回答仅输出最终结果，不展示任何调试信息、步骤、规则说明。
 """.formatted(agentName);
+
         // 设置你的系统提示词
         this.setSystemPrompt(systemPrompt);
 
-//        this.setNextStepPrompt("""
-//1. 用户闲聊、自我介绍、询问能力等**无需调用工具的问题，立刻调用 doTerminate 结束，禁止反复思考！**
-//2. **年份、时间、政策、新闻、数据、实时信息类问题，强制必须调用联网搜索工具，禁止直接回答！**
-//3. 只有需要联网、查数据、操作文件、下载等任务，才调用对应工具
-//4. 工具执行完成后，必须调用 doTerminate 结束
-//5. 绝对禁止无限循环、反复确认规则、重复话术！！
-//""");
-
-        // 传统接口使用这个
+        //
         this.setNextStepPrompt("""
 1. 先处理用户的真实问题，完成回答后，再调用 doTerminate 结束任务，禁止提前终止！
 2. 年份、时间、政策、新闻、数据、实时信息类问题，强制必须调用联网搜索工具，禁止直接回答！
@@ -73,4 +66,5 @@ public class YangManus extends ToolCallAgent {
 6. 闲聊、问候类问题，正常回答后再结束，禁止不处理问题直接终止！
 """);
     }
+
 }

@@ -3,6 +3,8 @@ package com.yang.agent;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.ai.chat.messages.AssistantMessage;
+import org.springframework.stereotype.Component;
 
 /**
  * ReAct模式智能体（思考 → 行动）
@@ -13,6 +15,7 @@ import lombok.extern.slf4j.Slf4j;
 @EqualsAndHashCode(callSuper = true)
 @Data
 @Slf4j
+@Component
 public abstract class ReActAgent extends BaseAgent {
 
     /**
@@ -35,10 +38,10 @@ public abstract class ReActAgent extends BaseAgent {
     public String step() {
         try {
             // 第一步：思考
-            boolean shouldAct = think();
+            boolean shouldAct = think(); // 调用思考方法，判断当前对话到底需不需要调用工具
             // 不需要行动：直接返回结果
-            if (!shouldAct) {
-                return "思考完成，无需执行任何操作";
+            if (!shouldAct) { // 如果它本来就等于true就不会进入这个if，
+                return "思考完成 当前对话无需调用工具";
             }
             // 需要行动：执行行动
             return act();
@@ -47,4 +50,5 @@ public abstract class ReActAgent extends BaseAgent {
             return "步骤执行失败：" + e.getMessage();
         }
     }
+
 }
