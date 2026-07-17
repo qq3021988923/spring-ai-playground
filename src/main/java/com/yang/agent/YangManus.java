@@ -1,4 +1,3 @@
-
 package com.yang.agent;
 
 import org.springframework.ai.chat.client.ChatClient;

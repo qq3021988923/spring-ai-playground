@@ -2,12 +2,14 @@ package com.yang.controller;
 
 import com.yang.agent.YangManus;
 import com.yang.model.dto.ChatRequest;
+import com.yang.rag.LoveDocumentLoader;
 import com.yang.service.LoveAdvisorService;
 import com.yang.service.OllamaService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
@@ -29,22 +31,13 @@ public class AiController2 {
     private YangManus yangManus;
 
     @GetMapping("/love/chat")
-    @Operation(summary = "上下文存储数据库，恋爱顾问7", description = "基于 RAG 的恋爱顾问")
+    @Operation(summary = "恋爱顾问", description = "支持状态过滤：单身/恋爱/已婚（不传则搜全部）")
     public String loveChat(@RequestParam String question,
-                           @RequestParam(defaultValue = "user001") String userId) {
-        return loveAdvisorService.chat(question, "love_" + userId);
+                           @RequestParam(defaultValue = "user001") String userId,
+                           @RequestParam(required = false) String status) {
+        return loveAdvisorService.chat(question, "love_" + userId, status);
     }
 
-//    // 原有旧Agent接口（保留，添加userId参数） 待优化
-//    @GetMapping("/agent") //
-//    @Operation(summary = "有记忆 能自主规划，调用工具 8", description = "" +
-//            "ReAct 思考 - 行动模式。工具调用（手动管控）。上下文短期记忆（多轮对话）。状态机管理（防死循环）。智能体人设 / 规则约束。联网搜索强制规则。将数据存储本地数据库")
-//    public String agentChat(
-//            @RequestParam(defaultValue = "user001") String userId,
-//            @RequestParam String input) {
-//        // ✅ 用userId作为会话ID，不同用户上下文完全隔离
-//        return yangManus.run(userId, input);
-//    }
 
     // 后续可以修改成 逐字打字机效果。现在还不是
     // 现在是后台默默干活，干完一次性甩给你完整结果 异步处理
@@ -64,17 +57,37 @@ public class AiController2 {
             return yangManus.run(request.getMessage(),userId); // 接口待优化： 对话上下文存储记忆
         } else if ("love".equals(request.getMode())) {
             String charId = "love_" + userId; // 统一用小写 love_，和 SSE 接口保持一致
-            return loveAdvisorService.chatWithTools(request.getMessage(),charId); // .call()
+            return loveAdvisorService.chatWithTools(request.getMessage(), charId, null);
         } else if ("ollama".equals(request.getMode())) {
             return ollamaService.fullAgentChat(request.getMessage());
         }
         return "";
     }
 
-    // 流式版（新增）
+    @Autowired
+    private LoveDocumentLoader documentLoader;
+    // 流式版（单 Query RAG + 工具调用）
     @GetMapping(value = "/love/chat/sse", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public Flux<String> loveChatStream(String message, String userId) {
-        return loveAdvisorService.chatStream(message, "love_" + userId);
+
+      // documentLoader.clearKnowledgeBase();
+
+        return loveAdvisorService.chatStream(message, "love_" + userId, null);
+    }
+
+    // 流式多Query扩展版（多Query检索 + 工具调用）
+    /*
+    love/chat/sse	    /love/chat/sse/multi-query
+    查数据库次数	1 次	4 次
+    检索文档上限	3 条	12 条（去重前）
+    额外大模型调用	无	    +1 次（Query 扩展）
+    额外耗时	无	        ~30ms（3 次额外 HNSW 查询）
+    * */
+    @GetMapping(value = "/love/chat/sse/multi-query", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    @Operation(summary = "恋爱顾问（多Query扩展）", description = "单问题扩展为4个变体并行检索，去重合并后回答")
+    public Flux<String> loveChatStreamMultiQuery(String message, String userId) {
+
+        return loveAdvisorService.chatStreamWithMultiQuery(message, "love_" + userId, null);
     }
 
 }

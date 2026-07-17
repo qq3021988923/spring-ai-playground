@@ -4,25 +4,29 @@ import com.yang.advisor.MyLoggerAdvisor;
 import com.yang.advisor.ReReadingAdvisor;
 import com.yang.chatmemory.FileBasedChatMemory;
 import com.yang.rag.LoveDocumentLoader;
+import com.yang.rag.QueryExpander;
 import com.yang.rag.QueryRewriter;
-import org.springframework.ai.tool.ToolCallback;
 import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.client.advisor.MessageChatMemoryAdvisor;
 import org.springframework.ai.chat.client.advisor.api.Advisor;
 import org.springframework.ai.chat.memory.ChatMemory;
-import org.springframework.ai.chat.prompt.PromptTemplate;
 import org.springframework.ai.document.Document;
+import org.springframework.ai.rag.Query;
 import org.springframework.ai.rag.advisor.RetrievalAugmentationAdvisor;
 import org.springframework.ai.rag.generation.augmentation.ContextualQueryAugmenter;
 import org.springframework.ai.rag.retrieval.search.DocumentRetriever;
 import org.springframework.ai.rag.retrieval.search.VectorStoreDocumentRetriever;
+import org.springframework.ai.tool.ToolCallback;
+import org.springframework.ai.vectorstore.SearchRequest;
 import org.springframework.ai.vectorstore.VectorStore;
+import org.springframework.ai.vectorstore.filter.Filter;
+import org.springframework.ai.vectorstore.filter.FilterExpressionBuilder;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
 
-import java.util.List;
+import java.util.*;
 
 @Slf4j
 @Service
@@ -31,6 +35,7 @@ public class LoveAdvisorService {
     private final VectorStore vectorStore;
     private final LoveDocumentLoader documentLoader;
     private final QueryRewriter queryRewriter;
+    private final QueryExpander queryExpander;
     private final ToolCallback[] allTools;
     private final ChatClient chatClient;
 
@@ -50,72 +55,55 @@ public class LoveAdvisorService {
                               LoveDocumentLoader documentLoader,
                               VectorStore vectorStore,
                               QueryRewriter queryRewriter,
+                              QueryExpander queryExpander,
                               ToolCallback[] allTools) {
         this.documentLoader = documentLoader;
         this.vectorStore = vectorStore;
         this.queryRewriter = queryRewriter;
+        this.queryExpander = queryExpander;
         this.allTools = allTools;
 
-        // 文件版记忆，重启不丢
         String fileDir = System.getProperty("user.dir") + "/tmp/chat-memory";
         ChatMemory chatMemory = new FileBasedChatMemory(fileDir);
 
-        // ChatClient 焊死：System Prompt + 对话记忆 + 生产级 RAG + 日志
         this.chatClient = chatClientBuilder
                 .defaultSystem(SYSTEM_PROMPT)
                 .defaultAdvisors(
-                        MessageChatMemoryAdvisor.builder(chatMemory).build(), // 对话记忆
-                        new ReReadingAdvisor(),                                // Re2 推理增强
-                        buildRagAdvisor(),                                     // 生产级 RAG（检索+兜底）
-                        new MyLoggerAdvisor()                                  // 日志
+                        MessageChatMemoryAdvisor.builder(chatMemory).build(),
+                        new ReReadingAdvisor(),
+                        new MyLoggerAdvisor()
                 )
                 .build();
     }
 
     // ==================== 公开方法 ====================
 
-    /**
-     * 同步对话：Query 改写 → RAG 检索 → LLM 回答 → 存向量库
-     */
-    public String chat(String userQuestion, String chatId) {
-        log.info("用户问题：{}，会话ID：{}", userQuestion, chatId);
-
-        // 1. Query 改写：把口语转成检索关键词
-        String rewrittenQuery = queryRewriter.doQueryRewrite(userQuestion);
-        log.info("改写后查询：{}", rewrittenQuery);
-
-        // 2. 调用 AI
+    public String chat(String userQuestion, String chatId, String status) {
+        log.info("用户问题：{}，会话ID：{}，状态：{}", userQuestion, chatId, status);
+        String rewrittenQuery = rewriteIfNeeded(userQuestion);
         String answer = chatClient
                 .prompt()
                 .user(rewrittenQuery)
                 .advisors(spec -> spec.param(ChatMemory.CONVERSATION_ID, chatId))
+                .advisors(buildRagAdvisor(status))
                 .call()
                 .content();
-
         log.info("回复：{}", answer);
-
-        // 3. 存入 PgVector 长期记忆
         saveToVectorStore(userQuestion, answer, chatId);
         return answer;
     }
 
-    /**
-     * 流式对话（SSE）：Query 改写 → RAG 检索 → LLM 流式回答 → 流结束后存向量库
-     */
-    public Flux<String> chatStream(String userQuestion, String chatId) {
-        log.info("用户问题（流式）：{}，会话ID：{}", userQuestion, chatId);
-
-        // 1. Query 改写
-        String rewrittenQuery = queryRewriter.doQueryRewrite(userQuestion);
-        log.info("改写后查询：{}", rewrittenQuery);
-
-        // 2. 流式调用
+    /** 流式对话：单 Query RAG + 工具调用 */
+    public Flux<String> chatStream(String userQuestion, String chatId, String status) {
+        log.info("用户问题（流式）：{}，会话ID：{}，状态：{}", userQuestion, chatId, status);
+        String rewrittenQuery = rewriteIfNeeded(userQuestion);
         StringBuilder fullAnswer = new StringBuilder();
-
         return chatClient
                 .prompt()
                 .user(rewrittenQuery)
                 .advisors(spec -> spec.param(ChatMemory.CONVERSATION_ID, chatId))
+                .advisors(buildRagAdvisor(status))
+                .toolCallbacks(allTools)
                 .stream()
                 .content()
                 .doOnNext(fullAnswer::append)
@@ -125,22 +113,37 @@ public class LoveAdvisorService {
                 });
     }
 
-    /**
-     * 工具调用对话：AI 可以自主调用 8 个工具（搜索、爬虫、文件、图片等）完成任务
-     */
-    public String chatWithTools(String userQuestion, String chatId) {
-        log.info("用户问题（工具调用）：{}，会话ID：{}", userQuestion, chatId);
+    /** 流式对话：多 Query 扩展 RAG + 工具调用 */
+    public Flux<String> chatStreamWithMultiQuery(String userQuestion, String chatId, String status) {
+        log.info("用户问题（多Query流式）：{}，会话ID：{}，状态：{}", userQuestion, chatId, status);
+        String rewrittenQuery = rewriteIfNeeded(userQuestion);
+        StringBuilder fullAnswer = new StringBuilder();
+        return chatClient
+                .prompt()
+                .user(rewrittenQuery)
+                .advisors(spec -> spec.param(ChatMemory.CONVERSATION_ID, chatId))
+                .advisors(buildMultiQueryRagAdvisor(rewrittenQuery, status))
+                .toolCallbacks(allTools)
+                .stream()
+                .content()
+                .doOnNext(fullAnswer::append)
+                .doOnComplete(() -> {
+                    log.info("多Query扩展检索完成");
+                    saveToVectorStore(userQuestion, fullAnswer.toString(), chatId);
+                });
+    }
 
-        String rewrittenQuery = queryRewriter.doQueryRewrite(userQuestion);
-
+    public String chatWithTools(String userQuestion, String chatId, String status) {
+        log.info("用户问题（工具调用）：{}，会话ID：{}，状态：{}", userQuestion, chatId, status);
+        String rewrittenQuery = rewriteIfNeeded(userQuestion);
         String answer = chatClient
                 .prompt()
                 .user(rewrittenQuery)
                 .advisors(spec -> spec.param(ChatMemory.CONVERSATION_ID, chatId))
-                .toolCallbacks(allTools)    // ← 核心：挂载 8 个工具
+                .advisors(buildRagAdvisor(status))
+                .toolCallbacks(allTools)
                 .call()
                 .content();
-
         log.info("回复：{}", answer);
         saveToVectorStore(userQuestion, answer, chatId);
         return answer;
@@ -148,29 +151,31 @@ public class LoveAdvisorService {
 
     // ==================== 私有方法 ====================
 
-    /**
-     * 构建生产级 RAG Advisor：
-     * - 相似度阈值 0.5（太低不相关的结果不要）
-     * - TopK 3（最多返回 3 条）
-     * - 翻不到资料时兜底，拒绝瞎编
-     */
-    private Advisor buildRagAdvisor() {
-        // 检索器：控制检索参数
-        DocumentRetriever retriever = VectorStoreDocumentRetriever.builder()
+    private String rewriteIfNeeded(String userQuestion) {
+        if (userQuestion.length() < 3) {
+            return queryRewriter.doQueryRewrite(userQuestion);
+        }
+        log.info("问题已足够具体，跳过改写");
+        return userQuestion;
+    }
+
+    /** 标准 RAG Advisor（单 Query） */
+    private Advisor buildRagAdvisor(String status) {
+        VectorStoreDocumentRetriever.Builder retrieverBuilder = VectorStoreDocumentRetriever.builder()
                 .vectorStore(vectorStore)
-                .similarityThreshold(0.5)   // 生产级：低于 50% 相似度的不要
-                .topK(3)                    // 生产级：最多返回 3 条
-                .build();
+                .similarityThreshold(0.5)
+                .topK(3);
 
-        // 兜底模板：翻不到相关资料时用这个回复，不让 AI 瞎编
-        PromptTemplate fallbackTemplate = new PromptTemplate("""
-                你应该输出下面的内容：
-                抱歉，我只能回答恋爱相关的问题，别的没办法帮到您哦。
-                """);
+        if (status != null && !status.isEmpty()) {
+            Filter.Expression filter = new FilterExpressionBuilder()
+                    .eq("status", status)
+                    .build();
+            retrieverBuilder.filterExpression(filter);
+        }
 
+        DocumentRetriever retriever = retrieverBuilder.build();
         ContextualQueryAugmenter augmenter = ContextualQueryAugmenter.builder()
-                .allowEmptyContext(false)                        // 不允许空上下文
-                .emptyContextPromptTemplate(fallbackTemplate)    // 翻不到资料时的兜底回复
+                .allowEmptyContext(false)
                 .build();
 
         return RetrievalAugmentationAdvisor.builder()
@@ -179,40 +184,71 @@ public class LoveAdvisorService {
                 .build();
     }
 
-    /**
-     * 把问答存入 PgVector 向量库（带质量过滤 + 用户标签）
-     */
+    /** 多 Query 扩展 RAG Advisor */
+    private Advisor buildMultiQueryRagAdvisor(String rewrittenQuery, String status) {
+        List<Query> expandedQueries = queryExpander.expand(rewrittenQuery); // 输出 4 个变体：
+
+        Set<String> seenIds = new LinkedHashSet<>();
+        List<Document> mergedDocs = new ArrayList<>();
+
+        for (Query q : expandedQueries) {
+            SearchRequest.Builder searchBuilder = SearchRequest.builder()
+                    .query(q.text())
+                    .topK(3)
+                    .similarityThreshold(0.5);
+
+            if (status != null && !status.isEmpty()) {
+                Filter.Expression filter = new FilterExpressionBuilder()
+                        .eq("status", status)
+                        .build();
+                searchBuilder.filterExpression(filter);
+            }
+
+            List<Document> docs = vectorStore.similaritySearch(searchBuilder.build());
+            for (Document doc : docs) {
+                String docId = doc.getId();
+                if (docId != null && seenIds.add(docId)) {
+                    mergedDocs.add(doc);
+                }
+            }
+        }
+
+        log.info("多Query检索：{} 个变体 → 去重后 {} 条文档", expandedQueries.size(), mergedDocs.size());
+
+        // 搜到文档或没搜到，都构建合法的 Advisor
+        // allowEmptyContext(true)：上下文为空时不注入"请说你不知道"的指令，让 AI 自行判断
+        DocumentRetriever mergedRetriever = query -> mergedDocs;
+        ContextualQueryAugmenter augmenter = ContextualQueryAugmenter.builder()
+                .allowEmptyContext(true)
+                .build();
+
+        return RetrievalAugmentationAdvisor.builder()
+                .documentRetriever(mergedRetriever)
+                .queryAugmenter(augmenter)
+                .build();
+    }
+
     private void saveToVectorStore(String question, String answer, String chatId) {
-        // ===== 质量过滤 =====
-        // 太短跳过（"你好""嗯""哦"没有检索价值）
-        if (answer.length() < 20) {
+        if (answer.length() < 10) {
             log.info("回答太短({}字)，跳过存入向量库", answer.length());
             return;
         }
-        // 兜底回复跳过（翻不到资料时的"抱歉，我只能回答恋爱问题"）
         if (answer.contains("抱歉，我只能回答恋爱相关的问题")) {
             log.info("兜底回复，跳过存入向量库");
             return;
         }
-
-        // ===== 存入向量库（带标签） =====
         String newKnowledge = """
         用户问题：%s
         恋爱顾问回答：%s
         """.formatted(question, answer);
-
         Document doc = new Document(newKnowledge);
-        doc.getMetadata().put("userId", chatId);           // 用户来源
-        doc.getMetadata().put("type", "conversation");     // 标记类型
+        doc.getMetadata().put("userId", chatId);
+        doc.getMetadata().put("type", "conversation");
         doc.getMetadata().put("timestamp", System.currentTimeMillis());
-
         vectorStore.add(List.of(doc));
         log.info("高质量问答已存入向量库，用户：{}", chatId);
     }
 
-    /**
-     * 启动时加载知识库文档到 PgVector
-     */
     @PostConstruct
     public void init() {
         documentLoader.initKnowledgeBase();

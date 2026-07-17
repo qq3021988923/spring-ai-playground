@@ -27,7 +27,7 @@ export const streamManus = (message, userId = 'user001', onData, onDone, onError
 
 // 恋爱顾问流式接口（返回 EventSource，由调用方自己绑事件）
 export const streamLove = (message, userId = 'user001') => {
-  const url = `${BASE_URL}/love/chat/sse?userId=${userId}&message=${encodeURIComponent(message)}`
+  const url = `${BASE_URL}/love/chat/sse/multi-query?userId=${userId}&message=${encodeURIComponent(message)}`
   return new EventSource(url)
 }
 

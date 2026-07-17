@@ -24,12 +24,18 @@ public class QueryRewriter {
                 .build();
     }
 
-    /**
-     * 执行查询重写，提升 RAG 检索命中率
+    /** 优化 RAG 检索命中率
+     * 你输入："我喜欢的女生不理我了怎么办"
+     *     ↓ AI 改写
+     * 改写后："追求对象不理睬的处理方法和沟通技巧"
+     *     ↓ 拿这个去 PgVector 搜
+     * 命中率更高
      */
     public String doQueryRewrite(String prompt) {
+        // 把用户输入的字符串包装成 Spring AI 的 Query 对象
         Query query = new Query(prompt);
+        // 调用 AI 改写（内部调了一次 LLM，额外花一次 API 费用）
         Query transformedQuery = queryTransformer.transform(query);
-        return transformedQuery.text();
+        return transformedQuery.text(); // 取出改写后的纯文本返回
     }
 }

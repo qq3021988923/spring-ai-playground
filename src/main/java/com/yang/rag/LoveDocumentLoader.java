@@ -26,18 +26,32 @@ public class LoveDocumentLoader {
         this.vectorStore = vectorStore;
     }
 
+    /** 三篇知识库文件与其对应状态标签 */
+    private static final String[][] KNOWLEDGE_FILES = {
+            {"document/恋爱常见问题和回答-单身篇.md", "单身"},
+            {"document/恋爱常见问题和回答-恋爱篇.md", "恋爱"},
+            {"document/恋爱常见问题和回答-已婚篇.md", "已婚"}
+    };
+
     public void initKnowledgeBase() {
-        log.info("正在加载恋爱知识库...");
-        try { // 读取本地初始化数据
-            TextReader reader = new TextReader(new ClassPathResource("document/love-knowledge.md"));
-            List<Document> documents = reader.get();  // 读取文件
-            TokenTextSplitter splitter = new TokenTextSplitter();
-            List<Document> chunks = splitter.apply(documents);
-            vectorStore.add(chunks);
-            log.info("知识库加载完成！共 {} 个文档片段", chunks.size());
-        } catch (Exception e) {
-            log.error("加载知识库失败", e);
+        log.info("正在加载恋爱知识库（按状态分类）...");
+        TokenTextSplitter splitter = new TokenTextSplitter();
+        int totalChunks = 0;
+        for (String[] file : KNOWLEDGE_FILES) {
+            try {
+                TextReader reader = new TextReader(new ClassPathResource(file[0]));
+                List<Document> documents = reader.get();
+                List<Document> chunks = splitter.apply(documents);
+                // 给每个文档片段打上状态标签
+                chunks.forEach(doc -> doc.getMetadata().put("status", file[1]));
+                vectorStore.add(chunks);
+                log.info("  {} → {} 个片段，状态标签：{}", file[0], chunks.size(), file[1]);
+                totalChunks += chunks.size();
+            } catch (Exception e) {
+                log.error("加载 {} 失败", file[0], e);
+            }
         }
+        log.info("知识库加载完成！共 {} 个文档片段（单身/恋爱/已婚）", totalChunks);
     }
 
     /**
@@ -58,18 +72,12 @@ public class LoveDocumentLoader {
          vectorStore 连 PgVector、怎么执行 SQL、怎么计算向量距离。
          similaritySearch 实际的搜索动作
         vectorStore.similaritySearch(request) 等价于
-        这是 PostgreSQL 专用的、带向量计算的 SQL，
-      普通的 MySQL 没有这种功能。
-        SELECT content, metadata,
-        1 - (embedding <=> ai_embedding('如何表白')) AS similarity -- 计算余弦相似度
-        FROM vector_store
-        ORDER BY embedding <=> ai_embedding('如何表白') -- 按与问题向量的距离排序
         LIMIT 3;这就是你设置的 topK(3)
         */
         return vectorStore.similaritySearch(request);
     }
 
-    //  vector_store 表里所有知识片段一次性删除 目前
+    //  清空 PgVector 里所有知识文档，从零开始重建
     public void clearKnowledgeBase() {
         log.warn("正在清空知识库...");
         // 简单方案：调用 vectorStore 的删除方法，传入空搜索获取所有ID
@@ -86,6 +94,7 @@ public class LoveDocumentLoader {
         log.info("知识库已清空");
     }
 
+    // 动往 PgVector 加一条知识
     public void addKnowledge(String content) {
         Document doc = new Document(content);
         TokenTextSplitter splitter = new TokenTextSplitter();

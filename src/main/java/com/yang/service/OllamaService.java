@@ -65,7 +65,7 @@ public class OllamaService {
             智能助手回答：%s
             """.formatted(userMessage, answer);
         Document newDoc = new Document(newKnowledge);
-        System.out.println("存储本地会话"+newDoc);
+        log.info("存储本地会话 {}",newDoc);
         vectorStore.add(List.of(newDoc));
         log.info("本地 Agent 对话已存入知识库");
 
