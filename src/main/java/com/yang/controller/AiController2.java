@@ -90,4 +90,11 @@ public class AiController2 {
         return loveAdvisorService.chatStreamWithMultiQuery(message, "love_" + userId, null);
     }
 
+    // 与上面的接口相比：结构化输出版返回 JSON 恋爱报告 。
+    @GetMapping(value = "/love/chat/report", produces = MediaType.APPLICATION_JSON_VALUE)
+    @Operation(summary = "恋爱顾问（结构化报告）", description = "多Query RAG + 工具调用后，输出结构化JSON恋爱分析报告")
+    public Object loveChatReport(String message, String userId) {
+        return loveAdvisorService.chatWithStructuredReport(message, "love_" + userId, null);
+    }
+
 }

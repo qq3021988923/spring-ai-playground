@@ -22,8 +22,11 @@ public class LoveDocumentLoader {
 
     private final VectorStore vectorStore;
 
-    public LoveDocumentLoader(VectorStore vectorStore) {
+    private final KeywordEnricher keywordEnricher;
+
+    public LoveDocumentLoader(VectorStore vectorStore,KeywordEnricher keywordEnricher) {
         this.vectorStore = vectorStore;
+        this.keywordEnricher = keywordEnricher;
     }
 
     /** 三篇知识库文件与其对应状态标签 */
@@ -44,6 +47,19 @@ public class LoveDocumentLoader {
                 List<Document> chunks = splitter.apply(documents);
                 // 给每个文档片段打上状态标签
                 chunks.forEach(doc -> doc.getMetadata().put("status", file[1]));
+                log.info("添加关键字之前的文档添加关键字之前的文档 {}", chunks);
+                /*
+                自动生成关键词 入库时多调一次 LLM，查询时零开销
+                知识库文档 → TokenTextSplitter → 打status标签 → KeywordEnricher生成关键词 → 存PgVector
+                每篇文档多了 keyword 字段
+                文档 → 切分 → 打 status 标签 → LLM生成关键词 → 存 PgVector
+   添加关键字的区别
+ metadata={charset=UTF-8, source=恋爱常见问题和回答-已婚篇.md, status=已婚}, score=null}
+ metadata={charset=UTF-8, excerpt_keywords=边界设定, 沟通协调, 尊重共融, source=恋爱常见问题和回答-已婚篇.md, status=已婚}
+                * */
+                chunks = keywordEnricher.enrich(chunks);
+                log.info("添加关键字之后的文档 {}", chunks);
+
                 vectorStore.add(chunks);
                 log.info("  {} → {} 个片段，状态标签：{}", file[0], chunks.size(), file[1]);
                 totalChunks += chunks.size();

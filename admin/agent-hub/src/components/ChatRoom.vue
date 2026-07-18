@@ -1,6 +1,6 @@
 <script setup>
 import { ref, nextTick, watch } from 'vue'
-import { chat, streamManus,streamLove } from '../api'
+import { chat, streamManus, streamLove } from '../api'
 
 const props = defineProps({
   mode: { type: String, default: 'agent' }
@@ -127,7 +127,7 @@ const sendLoveStream = (userMsg) => {
   currentEventSource = streamLove(userMsg, userId.value)
 
   currentEventSource.onmessage = (event) => {
-    messages.value[aiMsgIndex].content += event.data   // ← 必须通过 messages.value 改，Vue 才能追踪
+    messages.value[aiMsgIndex].content += event.data
     scrollToBottom()
   }
 

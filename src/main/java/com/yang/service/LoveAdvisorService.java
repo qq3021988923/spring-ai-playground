@@ -3,8 +3,10 @@ package com.yang.service;
 import com.yang.advisor.MyLoggerAdvisor;
 import com.yang.advisor.ReReadingAdvisor;
 import com.yang.chatmemory.FileBasedChatMemory;
+import com.yang.rag.KeywordEnricher;
 import com.yang.rag.LoveDocumentLoader;
 import com.yang.rag.QueryExpander;
+import com.yang.model.dto.LoveReport;
 import com.yang.rag.QueryRewriter;
 import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
@@ -38,6 +40,7 @@ public class LoveAdvisorService {
     private final QueryExpander queryExpander;
     private final ToolCallback[] allTools;
     private final ChatClient chatClient;
+    private final KeywordEnricher keywordEnricher;
 
     private static final String SYSTEM_PROMPT = """
             你是一位专业的恋爱顾问，名叫"小红娘"。
@@ -56,12 +59,14 @@ public class LoveAdvisorService {
                               VectorStore vectorStore,
                               QueryRewriter queryRewriter,
                               QueryExpander queryExpander,
-                              ToolCallback[] allTools) {
+                              ToolCallback[] allTools,
+                              KeywordEnricher keywordEnricher) {
         this.documentLoader = documentLoader;
         this.vectorStore = vectorStore;
         this.queryRewriter = queryRewriter;
         this.queryExpander = queryExpander;
         this.allTools = allTools;
+        this.keywordEnricher=keywordEnricher;
 
         String fileDir = System.getProperty("user.dir") + "/tmp/chat-memory";
         ChatMemory chatMemory = new FileBasedChatMemory(fileDir);
@@ -131,6 +136,43 @@ public class LoveAdvisorService {
                     log.info("多Query扩展检索完成");
                     saveToVectorStore(userQuestion, fullAnswer.toString(), chatId);
                 });
+    }
+
+    /**
+     * 结构化输出：多 Query RAG + 工具调用 → 返回 JSON 恋爱报告
+     *
+     * <p><b>与流式接口的区别：</b></p>
+     * - 流式：一个字一个字推给前端，用于聊天窗口打字机效果
+     * - 本方法：大模型回答完后，Spring AI 把 JSON 自动转成 LoveReport 对象返回
+     *
+     * <p><b>面试要点：</b></p>
+     * "通过 ChatClient.call().entity() 约束大模型按 JSON Schema 输出，
+     *  实现了大模型 → 结构化 API 的转换，可用于后端对接、前端分块渲染等场景。"
+     */
+    public LoveReport chatWithStructuredReport(String userQuestion, String chatId, String status) {
+        log.info("用户问题（结构化报告）：{}，会话ID：{}", userQuestion, chatId);
+        String rewrittenQuery = rewriteIfNeeded(userQuestion);
+
+        /*
+         * .call().entity(LoveReport.class) 做了什么：
+         * 1. Spring AI 自动读取 LoveReport 的字段（problem、analysis等）
+         * 2. 告诉大模型："请按这个 JSON 结构输出，不要输出废话"
+         * 3. 大模型返回 JSON 字符串
+         * 4. Spring AI 反序列化成 LoveReport 对象
+         * 5. 如果格式不对，自动让大模型重试一次
+         */
+        LoveReport report = chatClient
+                .prompt()
+                .user(rewrittenQuery
+                        + "\n\n请以JSON格式输出一份完整的恋爱分析报告，必须包含：问题诊断、深度分析、建议清单、行动计划、风险等级和鼓励语。不要输出JSON以外的内容。")
+                .advisors(spec -> spec.param(ChatMemory.CONVERSATION_ID, chatId))
+                .advisors(buildMultiQueryRagAdvisor(rewrittenQuery, status))
+                .toolCallbacks(allTools)
+                .call()
+                .entity(LoveReport.class);
+
+        log.info("结构化报告生成成功：{}", report.getProblem());
+        return report;
     }
 
     public String chatWithTools(String userQuestion, String chatId, String status) {
@@ -245,6 +287,36 @@ public class LoveAdvisorService {
         doc.getMetadata().put("userId", chatId);
         doc.getMetadata().put("type", "conversation");
         doc.getMetadata().put("timestamp", System.currentTimeMillis());
+
+        if(answer.length() > 80){
+            doc=keywordEnricher.enrich(List.of(doc)).get(0);
+            log.info("高质量问答已生成关键字存入向量库 {}",doc);
+        }
+
+        /*
+        对比
+        Document{
+  text='用户问题：失恋了怎么走出来
+恋爱顾问回答：首先允许自己难过一周...（一大段回答）',
+  metadata={
+    userId=love_user001,
+    type=conversation,
+    timestamp=1728288000000
+  }
+}
+
+Document{
+  text='用户问题：失恋了怎么走出来
+恋爱顾问回答：首先允许自己难过一周...（一大段回答）',
+  metadata={
+    userId=love_user001,
+    type=conversation,
+    timestamp=1728288000000,
+    excerpt_keywords=失恋恢复, 情绪管理, 社交重建, 自我认同, 时间疗愈   ← 多了这个
+  }
+}
+        * */
+
         vectorStore.add(List.of(doc));
         log.info("高质量问答已存入向量库，用户：{}", chatId);
     }
