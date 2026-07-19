@@ -2,6 +2,8 @@ package com.yang.agent;
 
 import cn.hutool.core.collection.CollUtil;
 import cn.hutool.core.util.StrUtil;
+import com.yang.rag.QueryExpander;
+import com.yang.rag.QueryRewriter;
 import lombok.Data;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
@@ -10,18 +12,16 @@ import org.springframework.ai.chat.messages.Message;
 import org.springframework.ai.chat.messages.SystemMessage;
 import org.springframework.ai.chat.messages.UserMessage;
 import org.springframework.ai.document.Document;
-import cn.hutool.core.collection.CollUtil;
-import java.util.stream.Collectors;
+import org.springframework.ai.rag.Query;
 import org.springframework.ai.vectorstore.SearchRequest;
 import org.springframework.ai.vectorstore.VectorStore;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Component;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.List;
+import reactor.core.publisher.Flux;
+
+import java.util.*;
 import java.util.concurrent.CompletableFuture;
+import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
 /**
@@ -44,6 +44,9 @@ public abstract class BaseAgent {
     // ==================== 企业级记忆核心 ====================
     protected ChatMemory chatMemory;   // 短期上下文记忆（多轮对话）
     protected VectorStore vectorStore; // 长期向量库记忆（持久化存储）
+    protected QueryExpander queryExpander; // 多 Query 扩展检索
+    protected QueryRewriter queryRewriter; // Query 智能改写
+    protected Consumer<String> statusConsumer; // Flux 状态推送回调
 
 
     // ==================== 【修复】重置方法：接收外部会话ID，不再修改全局系统提示词 ====================
@@ -115,7 +118,7 @@ public abstract class BaseAgent {
                 sseEmitter.send(finalAnswer);
 
                 // 保存对话到数据库
-                saveConversationToVectorStore(userPrompt, finalAnswer);
+                saveConversationToVectorStore(userPrompt, finalAnswer, conversationId);
                 if (chatMemory != null) {
                     chatMemory.add(conversationId, new UserMessage(userPrompt));
                     chatMemory.add(conversationId, new org.springframework.ai.chat.messages.AssistantMessage(finalAnswer));
@@ -228,7 +231,7 @@ public abstract class BaseAgent {
             }
 
             // 将数据存储本地数据库 用户原始问题 最终回答响应
-            saveConversationToVectorStore(userPrompt, finalAnswer);
+            saveConversationToVectorStore(userPrompt, finalAnswer, conversationId);
             if (chatMemory != null) { // 添加上下文记忆
                 chatMemory.add(conversationId, new UserMessage(userPrompt));
                 chatMemory.add(conversationId, new org.springframework.ai.chat.messages.AssistantMessage(finalAnswer));
@@ -244,58 +247,96 @@ public abstract class BaseAgent {
         }
     }
 
-    // ==================== 向量库存储（长期记忆 - 企业级核心） ====================
-    protected void saveConversationToVectorStore(String userQuestion, String agentAnswer) {
+    // ==================== 向量库存储（与恋爱大师对齐：质量过滤 + 用户标签） ====================
+    protected void saveConversationToVectorStore(String userQuestion, String agentAnswer, String conversationId) {
         if (vectorStore == null) {
             log.debug("向量库未配置，跳过长期记忆存储");
+            return;
+        }
+
+        // ===== 质量过滤（与 LoveAdvisorService 对齐） =====
+        if (agentAnswer == null || agentAnswer.length() < 10) {
+            log.info("【{}】回答太短({}字)，跳过存入向量库", name, agentAnswer == null ? 0 : agentAnswer.length());
+            return;
+        }
+        if (agentAnswer.contains("抱歉") || agentAnswer.contains("我只能回答")) {
+            log.info("【{}】兜底回复，跳过存入向量库", name);
             return;
         }
 
         try {
             String content = "用户问题：" + userQuestion + "\nAI回答：" + agentAnswer;
             Document document = new Document(content);
+            document.getMetadata().put("userId", conversationId);
+            document.getMetadata().put("type", "conversation");
+            document.getMetadata().put("timestamp", System.currentTimeMillis());
             vectorStore.add(List.of(document));
-            log.info("✅ 【{}】对话已保存至向量库（长期记忆生效）", name);
+            log.info("✅ 【{}】高质量问答已存入向量库", name);
         } catch (Exception e) {
             log.error("❌ 【{}】向量库存储失败", name, e);
         }
-
-
     }
     /**
      * 封装RAG检索逻辑：查询向量库并将结果加入AI上下文
      * @param userPrompt 用户的问题
      */
+    /**
+     * RAG检索：Multi-Query 扩展 → 多角度检索 → 去重合并
+     * <p>
+     * 如果有 QueryExpander，先扩展为多个变体再从不同角度检索；
+     * 没有 QueryExpander 则降级为单 Query 检索。
+     */
     private void addRagContextToMessageList(String userPrompt) {
-        // 向量库未配置则直接返回
         if (vectorStore == null) {
             return;
         }
 
         try {
-            // 1. 构建向量库检索请求（RAG核心：根据用户问题查相似数据）
-            SearchRequest searchRequest = SearchRequest.builder()
-                    // 2. 设置检索关键词：用户当前输入的问题（用来做语义匹配）
-                    .query(userPrompt)
-                    // 3. 设置返回条数：最多返回3条最相似的文档（可改3/5/8）
-                    .topK(3)
-                    // 4. 设置相似度阈值：只保留相似度≥0.7的结果（过滤不相关内容）
-                    .similarityThreshold(0.7)
-                    // 5. 构建最终的检索请求对象
-                    .build();
+            // 智能改写：短问题调用 QueryRewriter，长问题直接用
+            String queryText = userPrompt;
+            if (queryRewriter != null && userPrompt.length() < 3) {
+                queryText = queryRewriter.doQueryRewrite(userPrompt);
+            }
 
-            // 2. 执行检索
-            List<Document> relevantDocs = vectorStore.similaritySearch(searchRequest);
+            List<Document> allDocs = new ArrayList<>();
 
-            if (CollUtil.isNotEmpty(relevantDocs)) {
-                log.info("【{}】RAG检索到相关文档 {} 条", name, relevantDocs.size());
-                // 3. 拼接检索结果，以SystemMessage形式加入上下文（避免混淆用户/助手消息）
-                String retrievedDocsContent = relevantDocs.stream()
-                        // 给每一条检索结果加标题，格式化文本
+            if (queryExpander != null) {
+                // ===== Multi-Query 扩展检索 =====
+                List<Query> expandedQueries = queryExpander.expand(queryText);
+                Set<String> seenIds = new LinkedHashSet<>();
+
+                for (Query q : expandedQueries) {
+                    List<Document> docs = vectorStore.similaritySearch(
+                            SearchRequest.builder()
+                                    .query(q.text())
+                                    .topK(3)
+                                    .similarityThreshold(0.5)
+                                    .build()
+                    );
+                    for (Document doc : docs) {
+                        String id = doc.getId();
+                        if (id != null && seenIds.add(id)) {
+                            allDocs.add(doc);
+                        }
+                    }
+                }
+                log.info("【{}】Multi-Query RAG：{} 个变体 → 去重后 {} 条文档", name, expandedQueries.size(), allDocs.size());
+            } else {
+                // ===== 单 Query 检索（降级） =====
+                allDocs = vectorStore.similaritySearch(
+                        SearchRequest.builder()
+                                .query(userPrompt)
+                                .topK(3)
+                                .similarityThreshold(0.7)
+                                .build()
+                );
+                log.info("【{}】单Query RAG：检索到 {} 条文档", name, allDocs.size());
+            }
+
+            if (CollUtil.isNotEmpty(allDocs)) {
+                String retrievedDocsContent = allDocs.stream()
                         .map(doc -> "参考文档：\n" + doc.getText())
-                        // 把所有结果拼接成一整段字符串
                         .collect(Collectors.joining("\n\n"));
-                System.out.println("我是向量数据库检索的数据\n" + retrievedDocsContent);
                 messageList.add(new SystemMessage(
                         "以下是与用户问题相关的参考资料，请优先基于这些资料回答；若资料无相关信息，再调用工具：\n"
                                 + retrievedDocsContent
@@ -307,6 +348,86 @@ public abstract class BaseAgent {
             log.error("【{}】RAG检索异常", name, e);
         }
     }
+    // ==================== Flux 流式执行（逐字推送 + 步骤可见） ====================
+    public Flux<String> runStreamFlux(String conversationId, String userPrompt) {
+        return Flux.create(sink -> {
+            this.statusConsumer = msg -> sink.next(msg);
+            reset(conversationId);
+
+            if (this.state != AgentState.IDLE) {
+                sink.next("[ERROR] 智能体状态异常：" + this.state);
+                sink.complete();
+                return;
+            }
+            if (StrUtil.isBlank(userPrompt)) {
+                sink.next("[ERROR] 用户输入不能为空");
+                sink.complete();
+                return;
+            }
+
+            this.state = AgentState.RUNNING;
+            messageList.add(new UserMessage(userPrompt));
+
+            // 动态步数：短问题 3 步，复杂问题 10 步
+            int dynamicMaxSteps = userPrompt.length() < 10 ? 3 : getMaxSteps();
+            sink.next("[STATUS] 正在分析问题...（最多思考 " + dynamicMaxSteps + " 步）");
+
+            String finalAnswer = "";
+
+            for (int i = 0; i < dynamicMaxSteps && state != AgentState.FINISHED; i++) {
+                currentStep = i + 1;
+                log.info("执行步骤：{}/{}", currentStep, dynamicMaxSteps);
+                String stepResult = step();
+
+                // 步骤结果不为空且未完成 → 中间状态
+                if (StrUtil.isBlank(stepResult) && state != AgentState.FINISHED) {
+                    sink.next("[STATUS] 正在执行第 " + currentStep + " 步...");
+                }
+
+                // 最终回答 → 推送内容
+                if (StrUtil.isNotBlank(stepResult) && state == AgentState.FINISHED) {
+                    finalAnswer = stepResult;
+                }
+            }
+
+            if (currentStep >= dynamicMaxSteps && state != AgentState.FINISHED) {
+                state = AgentState.FINISHED;
+                finalAnswer = "任务终止：已达到最大步骤数(" + dynamicMaxSteps + ")";
+            }
+
+            // 推送最终回答
+            if (StrUtil.isNotBlank(finalAnswer)) {
+                sink.next(finalAnswer);
+            } else {
+                sink.next("思考完成，当前对话无需调用工具");
+            }
+
+            // 保存记忆
+            saveConversationToVectorStore(userPrompt, finalAnswer, conversationId);
+            if (chatMemory != null) {
+                chatMemory.add(conversationId, new UserMessage(userPrompt));
+                chatMemory.add(conversationId, new org.springframework.ai.chat.messages.AssistantMessage(finalAnswer));
+            }
+
+            sink.next("[DONE]");
+            sink.complete();
+
+            this.state = AgentState.IDLE;
+            this.cleanup();
+        });
+    }
+
+    public void setQueryRewriter(QueryRewriter queryRewriter) {
+        this.queryRewriter = queryRewriter;
+    }
+
+    /** 向 Flux 推送状态消息（子类 ToolCallAgent 调用） */
+    public void pushStatus(String msg) {
+        if (statusConsumer != null) {
+            statusConsumer.accept(msg);
+        }
+    }
+
     // ==================== 抽象方法 ====================
     public abstract String step();
 

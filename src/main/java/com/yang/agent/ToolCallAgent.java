@@ -85,8 +85,13 @@ public abstract class ToolCallAgent extends ReActAgent {
             boolean hasToolCalls = !toolCallList.isEmpty(); // 取反 → 列表不为空 → AI需要调用工具
             log.info("【{}】是否需要调用工具：{}", getName(), hasToolCalls);
 
-            // 如果是true 。 ！hasToolCalls 就是取反，这个变量是false，进入这个if语句！！！
-            if (!hasToolCalls) { // 如果没有工具需要调用
+            if (hasToolCalls) {
+                for (AssistantMessage.ToolCall tc : toolCallList) {
+                    pushStatus("[TOOL] 调用工具：" + tc.name());
+                }
+            }
+
+            if (!hasToolCalls) {
                 // 在当前内部类 可以省略this.
                 setState(AgentState.FINISHED); // 无工具直接结束
                 return false;
@@ -134,6 +139,13 @@ public abstract class ToolCallAgent extends ReActAgent {
             ToolResponseMessage toolResponse = (ToolResponseMessage) getMessageList().get(getMessageList().size() - 1);
             // 打印日志：输出当前Agent名称 + 工具完整返回结果（包含是否报错、返回内容、工具调用ID）
             log.info("【{}】工具执行结果：{}", getName(), toolResponse.getResponses());
+            // 推送工具结果给前端
+            for (ToolResponseMessage.ToolResponse r : toolResponse.getResponses()) {
+                String preview = r.responseData().length() > 100
+                        ? r.responseData().substring(0, 100) + "..."
+                        : r.responseData();
+                pushStatus("[TOOL] " + r.name() + " 完成 → " + preview);
+            }
 
             // 标记当前 Agent 循环是否该终止
             // toolResponse.getResponses()：拿到本次全部工具执行结果集合（一次可并行调用多个工具）

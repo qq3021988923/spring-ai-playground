@@ -39,15 +39,14 @@ public class AiController2 {
     }
 
 
-    // 后续可以修改成 逐字打字机效果。现在还不是
-    // 现在是后台默默干活，干完一次性甩给你完整结果 异步处理
+
     @GetMapping(value = "/manus/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     @Operation(summary = "SSE流式调用YangManus超级智能体 9")
-    public SseEmitter doChatWithManus(
+    public Flux<String> doChatWithManus(
             @RequestParam(defaultValue = "user001") String userId,
             @RequestParam String message) {
-        // ✅ 用userId作为会话ID，不同用户上下文完全隔离
-        return yangManus.runStream(userId, message);
+        // Flux 逐字推送 + 步骤可见 + 工具调用详情
+        return yangManus.runStreamFlux(userId, message);
     }
 
     @PostMapping("/chat")

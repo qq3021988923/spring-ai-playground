@@ -37,6 +37,7 @@ spring:
         initialize-schema: true
         index-type: HNSW
         distance-type: COSINE_DISTANCE
+        dimensions: 1024
 
 # 直接把下面这段贴在最后！
 search:

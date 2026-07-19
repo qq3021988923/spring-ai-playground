@@ -1,6 +1,8 @@
 package com.yang.config;
 
 import com.yang.agent.YangManus;
+import com.yang.rag.QueryExpander;
+import com.yang.rag.QueryRewriter;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.memory.ChatMemory;
 import org.springframework.ai.chat.model.ChatModel;
@@ -37,11 +39,13 @@ public class AgentConfig {
 
     @Bean
     public YangManus yangManus(
-            ToolCallback[] toolCallbacks, //   所有工具
-            @Qualifier("dashscopeChatModel") ChatModel chatModel,  // 明确指定用阿里云百炼，不用 Ollama
-            ChatMemory chatMemory, // 上下文记忆
-            VectorStore vectorStore // 向量库
+            ToolCallback[] toolCallbacks,
+            @Qualifier("dashscopeChatModel") ChatModel chatModel,
+            ChatMemory chatMemory,
+            VectorStore vectorStore,
+            QueryExpander queryExpander,
+            QueryRewriter queryRewriter
     ) {
-        return new YangManus(toolCallbacks, chatModel, chatMemory, vectorStore);
+        return new YangManus(toolCallbacks, chatModel, chatMemory, vectorStore, queryExpander, queryRewriter);
     }
 }

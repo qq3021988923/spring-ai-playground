@@ -1,6 +1,6 @@
 import axios from 'axios'
 
-const BASE_URL = 'http://localhost:8090/ai'
+const BASE_URL = '/ai'
 
 // 🔥 新增 userId 参数（默认 user001），拼接到 query 中
 export const chat = (data, userId = 'user001') => {

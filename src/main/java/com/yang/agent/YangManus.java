@@ -1,5 +1,9 @@
 package com.yang.agent;
 
+import com.yang.advisor.MyLoggerAdvisor;
+import com.yang.advisor.ReReadingAdvisor;
+import com.yang.rag.QueryExpander;
+import com.yang.rag.QueryRewriter;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.memory.ChatMemory;
 import org.springframework.ai.chat.model.ChatModel;
@@ -8,8 +12,8 @@ import org.springframework.ai.vectorstore.VectorStore;
 import org.springframework.stereotype.Component;
 
 /**
-
  功能：流式输出 + 上下文记忆 + 向量库存储 + 工具调用 + 多步思考
+      + Multi-Query RAG + Re2 推理增强 + 请求日志
  */
 @Component
 public class YangManus extends ToolCallAgent {
@@ -19,17 +23,25 @@ public class YangManus extends ToolCallAgent {
     public YangManus(ToolCallback[] allTools,
                      ChatModel dashscopeChatModel,
                      ChatMemory chatMemory,
-                     VectorStore vectorStore) {
+                     VectorStore vectorStore,
+                     QueryExpander queryExpander,
+                     QueryRewriter queryRewriter) {
         super(allTools);
         // 基础配置
         this.setName("咩~");
-        this.setMaxSteps(7);
+        this.setMaxSteps(10);
         // ✅ 注入上下文记忆（多轮对话）
         this.setChatMemory(chatMemory);
         // ✅ 注入向量库（长期存储）
         this.setVectorStore(vectorStore);
-        // 绑定大模型
-        this.setChatClient(ChatClient.builder(dashscopeChatModel).build());
+        // ✅ 多 Query 扩展检索
+        this.setQueryExpander(queryExpander);
+        // ✅ Query 智能改写
+        this.setQueryRewriter(queryRewriter);
+        // 绑定大模型 + Re2 推理增强 + 日志
+        this.setChatClient(ChatClient.builder(dashscopeChatModel)
+                .defaultAdvisors(new ReReadingAdvisor(), new MyLoggerAdvisor())
+                .build());
 
         String agentName = "你是超级智能助手 小羊~，专业、严谨、守规则、能调用工具、能联网查询。";
 

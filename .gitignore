@@ -48,6 +48,10 @@ dist/
 
 admin/OA/
 
+# 对话记忆文件（Kryo 二进制序列化，不能用文本编辑器打开）
+tmp/chat-memory/
+*.kryo
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

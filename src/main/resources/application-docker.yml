@@ -1,0 +1,61 @@
+server:
+  port: 8090
+
+spring:
+  datasource:
+    # 注意：host 写 docker-compose 里的服务名 pgvector，不是 localhost
+    url: jdbc:postgresql://pgvector:5432/yu_ai_db
+    username: postgres
+    password: postgres
+    driver-class-name: org.postgresql.Driver
+
+  ai:
+    chat:
+      client:
+        enabled: false
+
+    dashscope:
+      api-key: ${DASHSCOPE_API_KEY:sk-8f196f4a6a394c248c15808a619a85ee}
+      chat:
+        options:
+          model: qwen-plus
+      embedding:
+        enabled: true
+        options:
+          model: text-embedding-v3
+
+    ollama:
+      base-url: http://localhost:11434
+      chat:
+        options:
+          model: qwen2.5:0.5b
+
+    vectorstore:
+      pgvector:
+        initialize-schema: true
+        index-type: HNSW
+        distance-type: COSINE_DISTANCE
+
+search:
+  api:
+    key: ${SERPAPI_KEY:d767f4f2a08e7512fcee6b1394e8188d420de7136438d87cbeaea84170ff092f}
+    hello: https://serpapi.com/search
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+  api-docs:
+    path: /v3/api-docs
+  group-configs:
+    - group: 'default'
+      paths-to-match: '/**'
+      packages-to-scan: com.yang.controller
+
+knife4j:
+  enable: true
+  setting:
+    language: zh_cn
+
+logging:
+  level:
+    org.springframework.ai: INFO
