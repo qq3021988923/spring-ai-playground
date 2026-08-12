@@ -30,14 +30,14 @@ spring:
     # └─────────────────────┴──────────────────────┴──────────────────────────────┘
 
     openai:
-      api-key: deepseek密钥
+      api-key: sk-87f31687e5d543b79b7fd6bc2a114b36
       base-url: https://api.deepseek.com
       chat:
         options:
           model: deepseek-v4-pro
 
     dashscope:
-      api-key: 阿里云千问
+      api-key: sk-8f196f4a6a394c248c15808a619a85ee
       chat:
         options:
           model: qwen-plus
@@ -63,7 +63,7 @@ spring:
 # 直接把下面这段贴在最后！
 search:
   api:
-    key: 搜索密钥
+    key: d767f4f2a08e7512fcee6b1394e8188d420de7136438d87cbeaea84170ff092f
     hello: https://serpapi.com/search
 
 springdoc:

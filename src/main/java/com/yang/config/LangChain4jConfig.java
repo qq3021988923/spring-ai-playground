@@ -18,7 +18,7 @@ import java.util.Map;
 @Configuration
 public class LangChain4jConfig {
 
-    private static final String API_KEY = "阿里云千问";
+    private static final String API_KEY = "sk-8f196f4a6a394c248c15808a619a85ee";
     private static final String MODEL_NAME = "qwen-plus";
 
     @Bean
