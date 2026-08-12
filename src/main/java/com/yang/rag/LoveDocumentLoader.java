@@ -37,16 +37,31 @@ public class LoveDocumentLoader {
     };
 
     public void initKnowledgeBase() {
-        log.info("正在加载恋爱知识库（按状态分类）...");
+        // 检查知识库是否已加载过（避免每次重启重复插入） 就是去 PgVector 随便拿 1 条记录，看看在不在。
+        long existingCount = vectorStore.similaritySearch(
+                SearchRequest.builder().query("").topK(1).build()
+        ).size();
+        if (existingCount > 0) {
+            log.info("知识库已存在（{} 条记录），跳过重复加载", existingCount);
+            return;
+        }
+        log.info("知识库为空，正在加载恋爱知识库（按状态分类）...");
+        // 可以 自定义每块大小、重叠区间。切多少块由文档长度自动算，现在使用的是默认的
         TokenTextSplitter splitter = new TokenTextSplitter();
         int totalChunks = 0;
         for (String[] file : KNOWLEDGE_FILES) {
             try {
-                TextReader reader = new TextReader(new ClassPathResource(file[0]));
+                TextReader reader = new TextReader(new ClassPathResource(file[0])); // file == i
+
+               //  由 Spring AI 提供的文档读取器。
                 List<Document> documents = reader.get();
+                // 切成 N 个小 Document
                 List<Document> chunks = splitter.apply(documents);
                 // 给每个文档片段打上状态标签
-                chunks.forEach(doc -> doc.getMetadata().put("status", file[1]));
+                chunks.forEach(doc -> {
+                    doc.getMetadata().put("status", file[1]);
+                    doc.getMetadata().put("userId", "system");  // 知识库文档标记，区别于用户对话
+                });
                 log.info("添加关键字之前的文档添加关键字之前的文档 {}", chunks);
                 /*
                 自动生成关键词 入库时多调一次 LLM，查询时零开销
@@ -58,10 +73,10 @@ public class LoveDocumentLoader {
  metadata={charset=UTF-8, excerpt_keywords=边界设定, 沟通协调, 尊重共融, source=恋爱常见问题和回答-已婚篇.md, status=已婚}
                 * */
                 chunks = keywordEnricher.enrich(chunks);
-                log.info("添加关键字之后的文档 {}", chunks);
+                log.info("添加关键字之后的文档 {} metadata", chunks);
 
                 vectorStore.add(chunks);
-                log.info("  {} → {} 个片段，状态标签：{}", file[0], chunks.size(), file[1]);
+                log.info("加载文档{} → {} 个片段，状态标签：{}", file[0], chunks.size(), file[1]);
                 totalChunks += chunks.size();
             } catch (Exception e) {
                 log.error("加载 {} 失败", file[0], e);

@@ -12,9 +12,13 @@ import org.springframework.stereotype.Component;
 @Component
 public class FileOperationTool {
 
-    // 读取项目端口，自动生成下载链接
+    // 读取项目端口
     @Value("${server.port:8090}")
     private String serverPort;
+
+    // 公网访问地址（上线时通过环境变量配置，本地开发默认 localhost）
+    @Value("${app.base-url:http://localhost}")
+    private String baseUrl;
 
     // 默认文件目录：tmp/file
     private final String FILE_DIR = FileConstant.FILE_SAVE_DIR + "/file";
@@ -58,12 +62,13 @@ public class FileOperationTool {
 
             // 2. 生成浏览器下载链接（对接你现有接口）
             String downloadUrl = String.format(
-                    "http://localhost:%s/api/ai/download?fileName=%s",
+                    "%s:%s/ai/download?fileName=%s",
+                    baseUrl,
                     serverPort,
                     fileName
             );
 
-            return "✅ 资料已保存为文件！\n🖱️ 点击链接直接浏览器下载：\n" + downloadUrl;
+            return "资料已保存为文件！\n🖱️ 点击链接直接浏览器下载：\n" + downloadUrl;
         } catch (Exception e) {
             return "保存失败：" + e.getMessage();
         }

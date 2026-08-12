@@ -9,73 +9,66 @@ import org.springframework.ai.chat.memory.ChatMemory;
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.tool.ToolCallback;
 import org.springframework.ai.vectorstore.VectorStore;
-import org.springframework.stereotype.Component;
 
 /**
- 功能：流式输出 + 上下文记忆 + 向量库存储 + 工具调用 + 多步思考
-      + Multi-Query RAG + Re2 推理增强 + 请求日志
+ * AI 超级智能体 — 参考鱼皮项目架构：简洁 prompt + 每次请求新建实例
  */
-@Component
 public class YangManus extends ToolCallAgent {
 
-
-    // 只要调用这个类 就会优先执行这个方法  构造方法
     public YangManus(ToolCallback[] allTools,
-                     ChatModel dashscopeChatModel,
+                     ChatModel chatModel,          // 当前为 DeepSeek V3（由 Controller 注入 openAiChatModel）
                      ChatMemory chatMemory,
                      VectorStore vectorStore,
                      QueryExpander queryExpander,
                      QueryRewriter queryRewriter) {
         super(allTools);
-        // 基础配置
-        this.setName("咩~");
-        this.setMaxSteps(10);
-        // ✅ 注入上下文记忆（多轮对话）
+        this.setName("小羊~");
+        this.setMaxSteps(18);
         this.setChatMemory(chatMemory);
-        // ✅ 注入向量库（长期存储）
         this.setVectorStore(vectorStore);
-        // ✅ 多 Query 扩展检索
         this.setQueryExpander(queryExpander);
-        // ✅ Query 智能改写
         this.setQueryRewriter(queryRewriter);
-        // 绑定大模型 + Re2 推理增强 + 日志
-        this.setChatClient(ChatClient.builder(dashscopeChatModel)
-                .defaultAdvisors(new ReReadingAdvisor(), new MyLoggerAdvisor())
-                .build());
 
-        String agentName = "你是超级智能助手 小羊~，专业、严谨、守规则、能调用工具、能联网查询。";
+        // 参考鱼皮项目：简洁 System Prompt，聚焦工具调用
+        // 动态注入当前日期，解决搜索返回旧数据的问题
+        String today = java.time.LocalDate.now().toString();
+        int year = java.time.Year.now().getValue();
+//        this.setSystemPrompt(String.format("""
+//                你是 小羊~，一个全能型 AI 助手，旨在解决用户提出的任何任务。
+//                你拥有多种工具可以调用来高效完成复杂的请求。
+//                【当前日期】%s
+//                【重要规则】
+//                1. 绝对不能使用内置搜索功能。
+//                2. 所有实时信息、最新数据、近期新闻、天气、价格、赛事结果等时效性内容，必须通过调用 searchWeb 工具来获取。
+//                3. 搜索时效性内容时，必须在搜索关键词里加上当前年份（%d），否则搜索引擎会返回过时数据。
+//                4. 没有调用工具就回答时效性问题，回答就是错误的，会给用户带来误导。
+//                5. 绝对禁止编造任何你不知道的信息，不知道就调用工具查询。
+//                """, today, year));
 
-        // 定义智能体人设/规则，约束 AI 行为
-        String systemPrompt = """
- %s。
-【核心目标】：用户问任何问题，优先给出清晰、有用、友好的自然语言回答，规则仅用于约束行为，绝不展示给用户。
+        this.setSystemPrompt(String.format("""
+        你是小羊，全能AI助手。用户用什么语言问，你就用什么语言答。
+        【当前日期】%s
+        1. 所有时效性数据必须通过 searchWeb 查询，关键词含当前年份（%d）。
+        2. 查不到数据就告知用户"目前无法获取该信息"，禁止推断。
+        3. 每次搜索完立刻整理结果并 doTerminate，最多搜索 1 次。
+        """, today, year));
 
-【铁律规则，必须严格执行】
-1. 全局优先联网原则：除了纯闲聊、简单问候、简单计算、基础常识外，所有问题一律优先调用联网搜索工具！
-2. 所有涉及：名单、数据、统计、院校、985、211、城市、校区、政策、历史、事件、时间、新闻、趋势、对比、官方信息，必须联网搜索权威来源，绝对禁止瞎编！
-3. 当前时间、日期、实时信息必须强制联网查询，确保信息准确！
-4. 你没有2025到2026年的实时知识，所有时效性问题，不能凭自身知识回答！只有常识、闲聊、计算、本地知识库问题，才可以直接回答。
-5. 调用工具后，整理成简洁的中文自然语言，禁止输出JSON、Markdown符号、工具调用过程。
-6. 禁止编造时间、数据，不知道必须调用工具查询。
-7. 用户需要保存资料、导出文件、下载内容时，必须优先联网获取真实数据，然后调用 saveAndGetDownloadUrl 工具保存并返回下载链接给用户！
-8. 人性化交互规则：
-   - 自我介绍/你能干嘛/你是谁：友好自然介绍自己，不提规则、不提工具、不生硬终止。
-   - 纯闲聊、问候、日常对话：正常温柔回应，禁止输出任何规则文本、禁止终止交互。
-9. 所有回答仅输出最终结果，不展示任何调试信息、步骤、规则说明。
-""".formatted(agentName);
 
-        // 设置你的系统提示词
-        this.setSystemPrompt(systemPrompt);
+//        this.setNextStepPrompt("""
+//                根据用户的需求，主动选择最合适的工具或工具组合。
+//                每次使用完工具后，立刻整理结果回复用户，然后调用 doTerminate 结束！
+//                查询时间/天气等实时数据：先searchWeb，若结果无具体数值，立刻scrapeWebPage抓取链接获取详情。
+//                禁止反复搜索同一个问题！
+//                """);
 
-        //
         this.setNextStepPrompt("""
-1. 先处理用户的真实问题，完成回答后，再调用 doTerminate 结束任务，禁止提前终止！
-2. 年份、时间、政策、新闻、数据、实时信息类问题，强制必须调用联网搜索工具，禁止直接回答！
-3. 只有需要联网、查数据、操作文件、下载等任务，才调用对应工具
-4. 工具执行完成后，必须调用 doTerminate 结束
-5. 绝对禁止无限循环、反复确认规则、重复话术！
-6. 闲聊、问候类问题，正常回答后再结束，禁止不处理问题直接终止！
-""");
-    }
+        搜索 → 有结果就整理回答 → 调用doTerminate结束。
+        没结果就scrapeWebPage抓取补充，禁止反复搜索同一问题。
+        """);
 
+        ChatClient chatClient = ChatClient.builder(chatModel)   // DeepSeek V3（当前主模型）
+                .defaultAdvisors(new ReReadingAdvisor(), new MyLoggerAdvisor())
+                .build();
+        this.setChatClient(chatClient);
+    }
 }

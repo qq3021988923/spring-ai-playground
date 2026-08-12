@@ -3,6 +3,7 @@ package com.yang.rag;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.model.ChatModel;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.ai.document.Document;
 import org.springframework.stereotype.Component;
 
@@ -36,23 +37,21 @@ public class KeywordEnricher {
      */
     private static final String KEYWORD_PROMPT = """
             你是一个中文关键词提取专家。
-            请阅读以下内容，提取3到5个最能概括核心主题的中文关键词。
+            请阅读以下内容，提取1到3个最能概括核心主题的中文关键词。
             要求：
             1. 关键词必须是中文，2到8个字
             2. 关键词之间用中文逗号（，）分隔
             3. 只输出关键词，不要任何解释、编号或额外文字
-
             示例 — 内容：追求心仪对象时，首先要建立自信，保持真诚，多了解对方的兴趣爱好
             输出：追求技巧，自信提升，真诚沟通，了解对方
-
             现在请处理以下内容：
             """;
 
     private final ChatClient chatClient;
 
-    public KeywordEnricher(ChatModel dashscopeChatModel) {
-        // 建一个专门用于生成关键词的 ChatClient，不走 SYSTEM_PROMPT 的恋爱人设
-        this.chatClient = ChatClient.builder(dashscopeChatModel).build();
+    public KeywordEnricher(@Qualifier("deepseekFlashChatModel") ChatModel flashChatModel) {
+        // 关键词生成是轻量任务，用 Flash 即可，省钱又快速
+        this.chatClient = ChatClient.builder(flashChatModel).build();
     }
 
     /**
@@ -66,7 +65,7 @@ public class KeywordEnricher {
             return documents;
         }
 
-        log.info("开始为 {} 篇文档生成中文关键词...", documents.size());
+        //log.info("开始为 {} 篇文档生成中文关键词...", documents.size());
         int successCount = 0;
 
         for (Document doc : documents) {
@@ -92,8 +91,20 @@ public class KeywordEnricher {
                     continue;
                 }
 
-                // 写入 metadata
-                doc.getMetadata().put("excerpt_keywords", keywords);
+
+                String newText = doc.getText() + "\n【关键词】" + keywords;
+
+                log.info("【存储数据的关键词】：{}", keywords);
+                try {
+
+                    // 把刚生成的关键词硬塞进 Document 的正文里，让后续向量化时带上关键词语义。
+                    java.lang.reflect.Field textField = Document.class.getDeclaredField("text");
+                    textField.setAccessible(true);
+                    textField.set(doc, newText);
+
+                } catch (Exception ignore) {}
+
+                doc.getMetadata().put("关键词", keywords);
                 successCount++;
                 log.debug("  关键词：{} ← {}", keywords,
                         snippet.substring(0, Math.min(30, snippet.length())));
@@ -103,7 +114,7 @@ public class KeywordEnricher {
             }
         }
 
-        log.info("中文关键词生成完成：{} / {} 篇成功", successCount, documents.size());
+        //log.info("中文关键词生成完成：{} / {} 篇成功", successCount, documents.size());
         return documents;
     }
 }

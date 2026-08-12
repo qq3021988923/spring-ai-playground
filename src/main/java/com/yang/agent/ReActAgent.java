@@ -40,8 +40,9 @@ public abstract class ReActAgent extends BaseAgent {
             // 第一步：思考
             boolean shouldAct = think(); // 调用思考方法，判断当前对话到底需不需要调用工具
             // 不需要行动：直接返回结果
-            if (!shouldAct) { // 如果它本来就等于true就不会进入这个if，
-                return "思考完成 当前对话无需调用工具";
+            if (!shouldAct) {
+                // 不需要调用工具 → 从 act() 拿 AI 的真实回答
+                return act();
             }
             // 需要行动：执行行动
             return act();

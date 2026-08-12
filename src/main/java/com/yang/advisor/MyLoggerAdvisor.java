@@ -72,7 +72,7 @@ public class MyLoggerAdvisor implements CallAdvisor, StreamAdvisor {
      * 如果你想改 prompt（比如追加一段话），也可以在这里改完再 return。
      */
     private ChatClientRequest before(ChatClientRequest request) {
-        log.info("AI Request: {}", request.prompt());
+        log.info("【系统提示词 + RAG PgVector检索 + 历史对话.kryo文件 + 你的问题】：{}", request.prompt());
         return request;
     }
 
@@ -81,7 +81,7 @@ public class MyLoggerAdvisor implements CallAdvisor, StreamAdvisor {
      * 这里只是打印日志。
      */
     private void observeAfter(ChatClientResponse chatClientResponse) {
-        log.info("AI Response: {}", chatClientResponse.chatResponse().getResult().getOutput().getText());
+        log.info("【AI 回复】: {}", chatClientResponse.chatResponse().getResult().getOutput().getText());
     }
 
     // ==================== 同步调用拦截 ====================

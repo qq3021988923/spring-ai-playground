@@ -17,6 +17,7 @@ import org.springframework.ai.model.tool.ToolCallingManager;
 import org.springframework.ai.model.tool.ToolExecutionResult;
 import org.springframework.ai.tool.ToolCallback;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -55,6 +56,25 @@ public abstract class ToolCallAgent extends ReActAgent {
                 .build();
     }
 
+    /** 删掉所有历史 tool_calls 和 tool_response 消息，只保留纯文本——防止严格模型报错 */
+    private void cleanOrphanToolCalls() {
+        List<Message> msgs = getMessageList();
+        List<Message> cleaned = new ArrayList<>();
+        for (Message msg : msgs) {
+            if (msg instanceof AssistantMessage am) {
+                if (am.getToolCalls().isEmpty()) {
+                    cleaned.add(msg); // 纯文本回复保留
+                }
+                // 含 tool_calls 的 → 丢弃
+            } else if (msg instanceof ToolResponseMessage) {
+                // 工具响应 → 丢弃
+            } else {
+                cleaned.add(msg); // UserMessage / SystemMessage 保留
+            }
+        }
+        setMessageList(cleaned);
+    }
+
     // 思考：AI 决定要不要调用工具
     @Override
     public boolean think() {
@@ -62,6 +82,8 @@ public abstract class ToolCallAgent extends ReActAgent {
         if (StrUtil.isNotBlank(getNextStepPrompt())) {
             getMessageList().add(new UserMessage(getNextStepPrompt()));
         }
+        // 清理残留的孤儿工具调用（DeepSeek/qwen-max 要求 tool_calls 必须有对应响应）
+        cleanOrphanToolCalls();
         List<Message> messageList = getMessageList();
     // this.chatOptions 调用的是public ToolCallAgent这个方法洗礼之后的属性 默认this.chatOptions AI关闭自动工具调用
         // 把「对话内容」和「AI 行为规则」打包成一个「完整请求包」，发给 AI 大模型！
@@ -84,12 +106,6 @@ public abstract class ToolCallAgent extends ReActAgent {
             log.info("【{}】思考结果：{}", getName(), assistantMsg.getText());
             boolean hasToolCalls = !toolCallList.isEmpty(); // 取反 → 列表不为空 → AI需要调用工具
             log.info("【{}】是否需要调用工具：{}", getName(), hasToolCalls);
-
-            if (hasToolCalls) {
-                for (AssistantMessage.ToolCall tc : toolCallList) {
-                    pushStatus("[TOOL] 调用工具：" + tc.name());
-                }
-            }
 
             if (!hasToolCalls) {
                 // 在当前内部类 可以省略this.
@@ -139,13 +155,6 @@ public abstract class ToolCallAgent extends ReActAgent {
             ToolResponseMessage toolResponse = (ToolResponseMessage) getMessageList().get(getMessageList().size() - 1);
             // 打印日志：输出当前Agent名称 + 工具完整返回结果（包含是否报错、返回内容、工具调用ID）
             log.info("【{}】工具执行结果：{}", getName(), toolResponse.getResponses());
-            // 推送工具结果给前端
-            for (ToolResponseMessage.ToolResponse r : toolResponse.getResponses()) {
-                String preview = r.responseData().length() > 100
-                        ? r.responseData().substring(0, 100) + "..."
-                        : r.responseData();
-                pushStatus("[TOOL] " + r.name() + " 完成 → " + preview);
-            }
 
             // 标记当前 Agent 循环是否该终止
             // toolResponse.getResponses()：拿到本次全部工具执行结果集合（一次可并行调用多个工具）

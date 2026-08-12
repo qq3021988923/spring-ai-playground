@@ -7,22 +7,11 @@ export const chat = (data, userId = 'user001') => {
   return axios.post(`${BASE_URL}/chat?userId=${userId}`, data).then(res => res.data)
 }
 
-// 🔥 新增 userId 参数（默认 user001），拼接到 SSE 请求 URL 中
-export const streamManus = (message, userId = 'user001', onData, onDone, onError) => {
+// 超级智能体（String 返回，后台思考完一次性给，用 fetch）
+export const fetchManus = async (message, userId = 'user001') => {
   const url = `${BASE_URL}/manus/stream?userId=${userId}&message=${encodeURIComponent(message)}`
-  const eventSource = new EventSource(url)
-  eventSource.onmessage = (event) => {
-    onData(event.data)
-  }
-  eventSource.onerror = (e) => {
-    eventSource.close()
-    if (eventSource.readyState === EventSource.CLOSED) {
-      onDone()
-    } else {
-      onError(e)
-    }
-  }
-  return eventSource
+  const res = await fetch(url)
+  return await res.text()
 }
 
 // 恋爱顾问流式接口（返回 EventSource，由调用方自己绑事件）
@@ -33,6 +22,6 @@ export const streamLove = (message, userId = 'user001') => {
 
 export default {
   chat,
-  streamManus,
+  fetchManus,
   streamLove
 }

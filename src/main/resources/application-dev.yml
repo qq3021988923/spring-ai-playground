@@ -15,8 +15,29 @@ spring:
         enabled: false  # 如果你不手动创建 ChatClient 的话可以禁用自动配置
 
 
+    # ==================== 双模型分工 ====================
+    #
+    # 当前状态：DeepSeek V4 Pro（主/Agent推理） + DeepSeek V4 Flash（快速通道） + qwen-plus（embedding + 备用）
+    #
+    # ┌─────────────────────┬──────────────────────┬──────────────────────────────┐
+    # │ 干什么               │ 当前用哪个             │ 说明                         │
+    # ├─────────────────────┼──────────────────────┼──────────────────────────────┤
+    # │ 超级智能体推理(think) │ DeepSeek V4 Pro       │ @Primary Bean，ToolCallAgent │     │    │
+    # │ 恋爱大师聊天         │ DeepSeek V4 Pro       │ LoveAdvisorService          │
+    # │ Query 改写/扩展      │ DeepSeek V4 Flash     │ QueryRewriter/QueryExpander │
+    # │ 关键词生成           │ DeepSeek V4 Flash     │ KeywordEnricher（轻量任务）│
+    # │ 文本 → 向量          │ qwen-plus/embedding   │ PgVector 检索用              │
+    # └─────────────────────┴──────────────────────┴──────────────────────────────┘
+
+    openai:
+      api-key: deepseek密钥
+      base-url: https://api.deepseek.com
+      chat:
+        options:
+          model: deepseek-v4-pro
+
     dashscope:
-      api-key: sk-8f196f4a6a394c248c15808a619a85ee
+      api-key: 阿里云千问
       chat:
         options:
           model: qwen-plus
@@ -42,7 +63,7 @@ spring:
 # 直接把下面这段贴在最后！
 search:
   api:
-    key: d767f4f2a08e7512fcee6b1394e8188d420de7136438d87cbeaea84170ff092f
+    key: 搜索密钥
     hello: https://serpapi.com/search
 
 springdoc:
@@ -63,6 +84,12 @@ knife4j:
 logging:
   level:
     org.springframework.ai: DEBUG
+
+# 对话记忆配置：每次丢给 LLM 的历史消息条数
+# DeepSeek V4 Pro 1M 上下文 → 100 条仅占 ~2.5%，非常安全
+# 想省 Token → 调到 50；想更长记忆 → 调到 200
+chat-memory:
+  max-recent-messages: 100
 
 #search:
 #  api:

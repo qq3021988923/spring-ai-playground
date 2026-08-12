@@ -14,11 +14,30 @@ spring:
       client:
         enabled: false
 
-    dashscope:
-      api-key: ${DASHSCOPE_API_KEY:sk-8f196f4a6a394c248c15808a619a85ee}
+    # ==================== 双模型分工 ====================
+    #
+    # 当前状态：DeepSeek V4 Pro（主/Agent推理） + DeepSeek V4 Flash（RAG辅助） + qwen-plus（embedding）
+    #
+    # ┌─────────────────────┬──────────────────────┬──────────────────────────────┐
+    # │ 干什么               │ 当前用哪个             │ 说明                         │
+    # ├─────────────────────┼──────────────────────┼──────────────────────────────┤
+    # │ 超级智能体推理(think) │ DeepSeek V4 Pro       │ @Primary Bean，ToolCallAgent │
+    # │ 恋爱大师聊天         │ DeepSeek V4 Pro       │ LoveAdvisorService          │
+    # │ Query 改写/扩展      │ DeepSeek V4 Flash     │ QueryRewriter/QueryExpander │
+    # │ 关键词生成           │ DeepSeek V4 Flash     │ KeywordEnricher（轻量任务）│
+    # │ 文本 → 向量          │ qwen-plus/embedding   │ PgVector 检索用              │
+    # └─────────────────────┴──────────────────────┴──────────────────────────────┘
+    #
+    openai:
+      api-key: ${DEEPSEEK_API_KEY:xxxx}
+      base-url: https://api.deepseek.com
       chat:
         options:
-          model: qwen-plus
+          model: deepseek-v4-pro
+
+    dashscope:
+      api-key: ${DASHSCOPE_API_KEY:xxxx}
+      # dashscope 只用于 embedding，聊天已全部切换至 DeepSeek
       embedding:
         enabled: true
         options:
@@ -35,10 +54,11 @@ spring:
         initialize-schema: true
         index-type: HNSW
         distance-type: COSINE_DISTANCE
+        dimensions: 1024
 
 search:
   api:
-    key: ${SERPAPI_KEY:d767f4f2a08e7512fcee6b1394e8188d420de7136438d87cbeaea84170ff092f}
+    key: ${SERPAPI_KEY:xxxx}
     hello: https://serpapi.com/search
 
 springdoc:
@@ -59,3 +79,7 @@ knife4j:
 logging:
   level:
     org.springframework.ai: INFO
+
+# 对话记忆配置
+chat-memory:
+  max-recent-messages: 100

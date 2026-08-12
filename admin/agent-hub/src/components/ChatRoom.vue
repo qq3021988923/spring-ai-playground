@@ -1,6 +1,6 @@
 <script setup>
-import { ref, nextTick, watch, onBeforeUnmount, onMounted } from 'vue'
-import { streamManus, streamLove } from '../api'
+import { ref, computed, nextTick, watch, onBeforeUnmount, onMounted } from 'vue'
+import { fetchManus, streamLove } from '../api'
 
 const props = defineProps({ mode: { type: String, default: 'love' }, hints: { type: Array, default: () => [] } })
 
@@ -12,11 +12,33 @@ const showScrollBtn = ref(false)
 let currentEventSource = null
 let searchTimer = null
 const searchDots = ref('')
-const userId = ref(localStorage.getItem('chatUserId') || 'user001')
+// 每台设备首次访问生成唯一 ID，存 localStorage 持久化
+const userId = ref(localStorage.getItem('chatUserId') || 'u_' + Math.random().toString(36).slice(2, 10))
+if (!localStorage.getItem('chatUserId')) {
+  localStorage.setItem('chatUserId', userId.value)
+}
+
+// 自动标题
+const emit = defineEmits(['title-ready'])
+const titleSet = ref(false)
+const maxInputLen = 500
+
+// 点击提示词直接发送
+const sendHint = (hint) => { inputMessage.value = hint; sendMessage() }
+
+// 重试失败消息
+const retryLast = () => {
+  const lastUser = [...messages.value].reverse().find(m => m.role === 'user')
+  if (!lastUser) return
+  messages.value.push({ role: 'user', content: lastUser.content, time: new Date().toLocaleTimeString('zh-CN', {hour:'2-digit',minute:'2-digit'}) })
+  loading.value = true
+  scrollToBottom()
+  props.mode === 'manus' ? sendManusStream(lastUser.content) : sendLoveStream(lastUser.content)
+}
 
 const modeConfig = {
-  love: { icon: '💕', name: '恋爱顾问小红娘', accent: '#ff00d4' },
-  manus: { icon: '⚡', name: '超级智能体 小羊~', accent: '#00f0ff' },
+  love: { icon: '💕', name: '知心 · 恋爱顾问', accent: '#ff00d4' },
+  manus: { icon: '⚡', name: '小羊 · 智能助手', accent: '#00f0ff' },
 }
 const c = () => modeConfig[props.mode] || modeConfig.love
 
@@ -75,63 +97,38 @@ const scrollToBottom = () => {
 
 const sendMessage = () => {
   if (!inputMessage.value.trim() || loading.value) return
-  messages.value.push({ role: 'user', content: inputMessage.value.trim() })
+  const userMsg = inputMessage.value.trim()
+  // 自动标题：首次对话用第一条消息前15字
+  if (!titleSet.value && messages.value.length === 0) {
+    const title = userMsg.length > 15 ? userMsg.slice(0, 15) + '...' : userMsg
+    const key = props.mode + '_title_' + userId.value
+    localStorage.setItem(key, title)
+    emit('title-ready', title)
+    titleSet.value = true
+  }
+  messages.value.push({ role: 'user', content: userMsg, time: new Date().toLocaleTimeString('zh-CN', {hour:'2-digit',minute:'2-digit'}) })
   inputMessage.value = ''
   loading.value = true
   scrollToBottom()
-  props.mode === 'manus' ? sendManusStream(messages.value[messages.value.length-1].content) : sendLoveStream(messages.value[messages.value.length-1].content)
+  props.mode === 'manus' ? sendManusStream(userMsg) : sendLoveStream(userMsg)
 }
 
-const sendManusStream = (userMsg) => {
-  // 插入占位消息用于显示最终回答
-  const aiMsgIndex = messages.value.length
-  messages.value.push({ role: 'assistant', content: '' })
-  let statusMsgs = []  // 临时收集状态/工具消息
-
-  currentEventSource = streamManus(userMsg, userId.value,
-    (data) => {
-      if (!data || !data.trim()) return
-
-      // 状态消息：[STATUS] xxx
-      if (data.startsWith('[STATUS]')) {
-        statusMsgs.push(data.replace('[STATUS] ', ''))
-        messages.value[aiMsgIndex].toolCalls = [...statusMsgs]  // Vue 追踪
-        scrollToBottom()
-        return
-      }
-
-      // 工具消息：[TOOL] xxx
-      if (data.startsWith('[TOOL]')) {
-        statusMsgs.push(data.replace('[TOOL] ', '🔧 '))
-        messages.value[aiMsgIndex].toolCalls = [...statusMsgs]
-        scrollToBottom()
-        return
-      }
-
-      // 错误消息
-      if (data.startsWith('[ERROR]')) {
-        messages.value[aiMsgIndex].content = data.replace('[ERROR] ', '⚠️ ')
-        loading.value = false
-        return
-      }
-
-      // 完成标记
-      if (data === '[DONE]') {
-        return
-      }
-
-      // 普通内容：追加到回答
-      messages.value[aiMsgIndex].content += data
-      scrollToBottom()
-    },
-    () => { loading.value = false; currentEventSource = null; scrollToBottom() },
-    () => { messages.value[aiMsgIndex].content = '网络出错了，请稍后再试'; loading.value = false; currentEventSource = null; scrollToBottom() }
-  )
+const sendManusStream = async (userMsg) => {
+  try {
+    const answer = await fetchManus(userMsg, userId.value)
+    messages.value.push({ role: 'assistant', content: answer || '思考完成，当前对话无需调用工具' })
+  } catch (e) {
+    messages.value.push({ role: 'assistant', content: '网络出错了，请稍后再试' })
+  } finally {
+    loading.value = false
+    currentEventSource = null
+    scrollToBottom()
+  }
 }
 
 const sendLoveStream = (userMsg) => {
   const i = messages.value.length
-  messages.value.push({ role: 'assistant', content: '' })
+  messages.value.push({ role: 'assistant', content: '', time: new Date().toLocaleTimeString('zh-CN', {hour:'2-digit',minute:'2-digit'}) })
   currentEventSource = streamLove(userMsg, userId.value)
   currentEventSource.onmessage = (e) => { messages.value[i].content += e.data; scrollToBottom() }
   currentEventSource.onerror = () => { currentEventSource.close(); loading.value = false; currentEventSource = null; scrollToBottom() }
@@ -153,31 +150,19 @@ const handleKeyDown = (e) => { if (e.key === 'Enter' && !e.shiftKey) { e.prevent
         <p class="empty-name">{{ c().name }}</p>
         <div v-if="hints.length > 0" class="hints-area">
           <p class="hint-label">试试问：</p>
-          <p v-for="(h, i) in hints" :key="i" class="hint-item">{{ h }}</p>
+          <p v-for="(h, i) in hints" :key="i" class="hint-item" @click="sendHint(h)">{{ h }}</p>
         </div>
       </div>
 
       <template v-for="(msg, i) in messages" :key="i">
         <div :class="['msg-row', msg.role]">
-          <div style="display:flex;flex-direction:column;gap:4px;max-width:72%;">
-            <!-- 工具调用状态（可折叠） -->
-            <div v-if="msg.toolCalls && msg.toolCalls.length > 0 && !msg.content" class="tool-status">
-              <div v-for="(t, j) in msg.toolCalls" :key="j" class="tool-line">{{ t }}</div>
-            </div>
-            <!-- 回答气泡 -->
-            <div v-if="msg.content" :class="['bubble', msg.role]">
-              <!-- 工具调用历史（已折叠） -->
-              <div v-if="msg.toolCalls && msg.toolCalls.length > 0" class="tool-summary" @click="msg.showTools = !msg.showTools">
-                🔧 调用了 {{ msg.toolCalls.length }} 个工具 {{ msg.showTools ? '▲' : '▼' }}
-              </div>
-              <div v-if="msg.showTools && msg.toolCalls" class="tool-detail">
-                <div v-for="(t, j) in msg.toolCalls" :key="j" class="tool-line-detail">{{ t }}</div>
-              </div>
-              {{ msg.content }}
-            </div>
+          <div :class="['msg-col', msg.role]">
+            <div :class="['bubble', msg.role]">{{ msg.content }}</div>
+            <div :class="['msg-time', msg.role]">{{ msg.time || '' }}</div>
           </div>
-          <!-- 复制按钮 -->
-          <div v-if="msg.role === 'assistant' && msg.content"
+          <div v-if="msg.role === 'assistant' && msg.content && msg.content.includes('出错')"
+            class="copy-btn retry-btn" @click="retryLast" title="重新生成">🔄</div>
+          <div v-else-if="msg.role === 'assistant' && msg.content"
             class="copy-btn" @click="copyMessage(msg.content)" title="复制">📋</div>
         </div>
       </template>
@@ -196,10 +181,14 @@ const handleKeyDown = (e) => { if (e.key === 'Enter' && !e.shiftKey) { e.prevent
     <div class="input-bar">
       <div class="input-wrap">
         <textarea v-model="inputMessage" placeholder="输入消息，Enter 发送..."
-          @keydown="handleKeyDown" rows="1" :disabled="loading"></textarea>
-        <!-- 停止生成 / 发送 -->
+          @keydown="handleKeyDown" rows="1" :disabled="loading" :maxlength="maxInputLen"></textarea>
         <button v-if="loading" class="stop-btn" @click="stopGeneration">⏹ 停止</button>
         <button v-else :disabled="!inputMessage.trim()" @click="sendMessage">发送</button>
+      </div>
+      <div class="input-info">
+        <span :class="['char-count', { over: inputMessage.length > maxInputLen - 50 }]">
+          {{ inputMessage.length }}/{{ maxInputLen }}
+        </span>
       </div>
     </div>
   </div>
@@ -239,21 +228,19 @@ const handleKeyDown = (e) => { if (e.key === 'Enter' && !e.shiftKey) { e.prevent
 .msg-row.user { justify-content: flex-end; }
 
 /* ===== 气泡 ===== */
-.bubble { max-width: 72%; padding: 10px 16px; border-radius: 14px; font-size: 14px; line-height: 1.65; word-break: break-word; backdrop-filter: blur(6px); }
+.bubble { max-width: 72%; padding: 10px 16px; border-radius: 14px; font-size: 14px; line-height: 1.65; overflow-wrap: break-word; white-space: pre-wrap; backdrop-filter: blur(6px); }
 .bubble.user { background: rgba(144,0,255,0.45); color: #fff; border-bottom-right-radius: 2px; border: 1px solid rgba(255,255,255,0.1); }
 .bubble.assistant { background: rgba(255,255,255,0.06); backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.08); color: rgba(255,255,255,0.8); border-bottom-left-radius: 2px; }
 
-/* ===== 工具调用状态 ===== */
-.tool-status { display: flex; flex-direction: column; gap: 3px; }
-.tool-line { font-size: 0.7rem; color: rgba(0,240,255,0.5); padding: 4px 10px; background: rgba(0,240,255,0.04); border-radius: 6px; border-left: 2px solid rgba(0,240,255,0.15); }
-
-.tool-summary { font-size: 0.68rem; color: rgba(0,240,255,0.5); cursor: pointer; padding: 3px 0; margin-bottom: 6px; border-bottom: 1px solid rgba(255,255,255,0.04); user-select: none; }
-.tool-summary:hover { color: rgba(0,240,255,0.8); }
-
-.tool-detail { display: flex; flex-direction: column; gap: 2px; margin-bottom: 8px; }
-.tool-line-detail { font-size: 0.65rem; color: rgba(255,255,255,0.3); padding: 2px 6px; }
 
 /* ===== 复制按钮 ===== */
+/* 消息列 */
+.msg-col { display: flex; flex-direction: column; max-width: 72%; }
+.msg-col.user { align-items: flex-end; }
+.msg-time { font-size: 0.6rem; color: rgba(255,255,255,0.15); margin-top: 2px; padding: 0 4px; }
+.msg-time.user { text-align: right; }
+.msg-time.assistant { text-align: left; }
+
 .copy-btn { opacity: 0; cursor: pointer; font-size: 0.75rem; padding: 4px; border-radius: 4px; transition: opacity 0.15s; flex-shrink: 0; }
 .msg-row:hover .copy-btn { opacity: 0.5; }
 .copy-btn:hover { opacity: 1 !important; background: rgba(255,255,255,0.08); }
@@ -296,4 +283,12 @@ const handleKeyDown = (e) => { if (e.key === 'Enter' && !e.shiftKey) { e.prevent
 .stop-btn { padding: 10px 22px !important; border: none !important; border-radius: 12px !important; font-size: 14px !important; font-weight: 600 !important; cursor: pointer !important; background: #f56c6c !important; color: #fff !important; animation: pulse-stop 1.5s infinite; }
 .stop-btn:hover { background: #e85b5b !important; }
 @keyframes pulse-stop { 0%,100%{ opacity: 1; } 50%{ opacity: .75; } }
+
+/* ===== 输入字数统计 ===== */
+.input-info { max-width: 800px; margin: 6px auto 0; text-align: right; }
+.char-count { font-size: 0.65rem; color: rgba(255,255,255,0.15); }
+.char-count.over { color: rgba(255,107,107,0.6); }
+
+/* ===== 重试按钮 ===== */
+.retry-btn:hover { color: #ffbe0b !important; }
 </style>
