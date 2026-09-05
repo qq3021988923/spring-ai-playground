@@ -22,9 +22,8 @@ public class AgentConfig {
     private String deepseekBaseUrl;
 
     /**
-     * DeepSeek V4 Flash — 快速轻量模型
-     * 适用场景：简单问答、意图识别、格式转换、闲聊
-     * 不适用：多步工具调用、复杂推理（交给 Pro）
+     * DeepSeek V4 Flash — 快速轻量模型（Pro 成本高已停用，Agent 推理/聊天也统一用 Flash）
+     * 适用场景：Agent 多步工具调用、复杂推理、简单问答、意图识别、格式转换、闲聊
      */
     @Bean
     public ChatModel deepseekFlashChatModel() {
@@ -58,8 +57,8 @@ public class AgentConfig {
         return ChatClient.builder(chatModel);
     }
 
-    // DeepSeek V4 Pro 作为主模型（openAiChatModel 由 spring-ai-starter-openai 自动创建）
-    // Agent 推理链（think → act）必须用 Pro，Flash 只做轻量任务
+    // DeepSeek V4 Flash 作为主模型（openAiChatModel 由 spring-ai-starter-openai 自动创建，模型名来自 yml）
+    // Agent 推理链（think → act）与恋爱大师聊天都统一用 Flash，节省成本
     @Bean
     @Primary
     public ChatClient.Builder chatClientBuilder(@Qualifier("openAiChatModel") ChatModel chatModel) {

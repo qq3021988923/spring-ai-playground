@@ -18,7 +18,8 @@ import java.util.Map;
 @Configuration
 public class LangChain4jConfig {
 
-    private static final String API_KEY = "sk-8f196f4a6a394c248c15808a619a85ee";
+    // 密钥从环境变量读取，禁止写死在代码里（DASHSCOPE_API_KEY 需自行在运行环境配置）
+    private static final String API_KEY = System.getenv().getOrDefault("DASHSCOPE_API_KEY", "xxxx");
     private static final String MODEL_NAME = "qwen-plus";
 
     @Bean

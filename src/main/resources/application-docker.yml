@@ -14,15 +14,15 @@ spring:
       client:
         enabled: false
 
-    # ==================== 双模型分工 ====================
+    # ==================== 模型分工 ====================
     #
-    # 当前状态：DeepSeek V4 Pro（主/Agent推理） + DeepSeek V4 Flash（RAG辅助） + qwen-plus（embedding）
+    # 当前状态：DeepSeek V4 Flash（统一聊天/Agent 推理，Pro 成本高已停用） + qwen-plus（embedding）
     #
     # ┌─────────────────────┬──────────────────────┬──────────────────────────────┐
     # │ 干什么               │ 当前用哪个             │ 说明                         │
     # ├─────────────────────┼──────────────────────┼──────────────────────────────┤
-    # │ 超级智能体推理(think) │ DeepSeek V4 Pro       │ @Primary Bean，ToolCallAgent │
-    # │ 恋爱大师聊天         │ DeepSeek V4 Pro       │ LoveAdvisorService          │
+    # │ 超级智能体推理(think) │ DeepSeek V4 Flash     │ @Primary Bean，ToolCallAgent │
+    # │ 恋爱大师聊天         │ DeepSeek V4 Flash     │ LoveAdvisorService          │
     # │ Query 改写/扩展      │ DeepSeek V4 Flash     │ QueryRewriter/QueryExpander │
     # │ 关键词生成           │ DeepSeek V4 Flash     │ KeywordEnricher（轻量任务）│
     # │ 文本 → 向量          │ qwen-plus/embedding   │ PgVector 检索用              │
@@ -33,7 +33,7 @@ spring:
       base-url: https://api.deepseek.com
       chat:
         options:
-          model: deepseek-v4-pro
+          model: deepseek-v4-flash
 
     dashscope:
       api-key: ${DASHSCOPE_API_KEY:xxxx}
@@ -80,6 +80,11 @@ logging:
   level:
     org.springframework.ai: INFO
 
-# 对话记忆配置
+# 对话记忆配置（超级智能体 manus 用）
 chat-memory:
   max-recent-messages: 100
+
+# 恋爱顾问（知心）对话记忆条数：独立于 manus，窗口收窄到 30 省主回答 token，长期记忆靠 PgVector 补
+love:
+  chat-memory:
+    max-recent-messages: 30

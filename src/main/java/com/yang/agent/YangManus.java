@@ -16,7 +16,7 @@ import org.springframework.ai.vectorstore.VectorStore;
 public class YangManus extends ToolCallAgent {
 
     public YangManus(ToolCallback[] allTools,
-                     ChatModel chatModel,          // 当前为 DeepSeek V3（由 Controller 注入 openAiChatModel）
+                     ChatModel chatModel,          // 当前为 DeepSeek V4 Flash（由 Controller 注入 openAiChatModel）
                      ChatMemory chatMemory,
                      VectorStore vectorStore,
                      QueryExpander queryExpander,
@@ -66,7 +66,7 @@ public class YangManus extends ToolCallAgent {
         没结果就scrapeWebPage抓取补充，禁止反复搜索同一问题。
         """);
 
-        ChatClient chatClient = ChatClient.builder(chatModel)   // DeepSeek V3（当前主模型）
+        ChatClient chatClient = ChatClient.builder(chatModel)   // DeepSeek V4 Flash（当前主模型）
                 .defaultAdvisors(new ReReadingAdvisor(), new MyLoggerAdvisor())
                 .build();
         this.setChatClient(chatClient);

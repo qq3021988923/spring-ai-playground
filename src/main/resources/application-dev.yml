@@ -15,29 +15,29 @@ spring:
         enabled: false  # 如果你不手动创建 ChatClient 的话可以禁用自动配置
 
 
-    # ==================== 双模型分工 ====================
+    # ==================== 模型分工 ====================
     #
-    # 当前状态：DeepSeek V4 Pro（主/Agent推理） + DeepSeek V4 Flash（快速通道） + qwen-plus（embedding + 备用）
+    # 当前状态：DeepSeek V4 Flash（统一聊天/Agent 推理，Pro 成本高已停用） + qwen-plus（embedding + 备用）
     #
     # ┌─────────────────────┬──────────────────────┬──────────────────────────────┐
     # │ 干什么               │ 当前用哪个             │ 说明                         │
     # ├─────────────────────┼──────────────────────┼──────────────────────────────┤
-    # │ 超级智能体推理(think) │ DeepSeek V4 Pro       │ @Primary Bean，ToolCallAgent │     │    │
-    # │ 恋爱大师聊天         │ DeepSeek V4 Pro       │ LoveAdvisorService          │
+    # │ 超级智能体推理(think) │ DeepSeek V4 Flash     │ @Primary Bean，ToolCallAgent │     │    │
+    # │ 恋爱大师聊天         │ DeepSeek V4 Flash     │ LoveAdvisorService          │
     # │ Query 改写/扩展      │ DeepSeek V4 Flash     │ QueryRewriter/QueryExpander │
     # │ 关键词生成           │ DeepSeek V4 Flash     │ KeywordEnricher（轻量任务）│
     # │ 文本 → 向量          │ qwen-plus/embedding   │ PgVector 检索用              │
     # └─────────────────────┴──────────────────────┴──────────────────────────────┘
 
     openai:
-      api-key: sk-87f31687e5d543b79b7fd6bc2a114b36
+      api-key: ${DEEPSEEK_API_KEY:xxxx}
       base-url: https://api.deepseek.com
       chat:
         options:
-          model: deepseek-v4-pro
+          model: deepseek-v4-flash
 
     dashscope:
-      api-key: sk-8f196f4a6a394c248c15808a619a85ee
+      api-key: ${DASHSCOPE_API_KEY:xxxx}
       chat:
         options:
           model: qwen-plus
@@ -63,7 +63,7 @@ spring:
 # 直接把下面这段贴在最后！
 search:
   api:
-    key: d767f4f2a08e7512fcee6b1394e8188d420de7136438d87cbeaea84170ff092f
+    key: ${SERPAPI_KEY:xxxx}
     hello: https://serpapi.com/search
 
 springdoc:
@@ -85,11 +85,17 @@ logging:
   level:
     org.springframework.ai: DEBUG
 
-# 对话记忆配置：每次丢给 LLM 的历史消息条数
-# DeepSeek V4 Pro 1M 上下文 → 100 条仅占 ~2.5%，非常安全
+# 对话记忆配置：每次丢给 LLM 的历史消息条数（超级智能体 manus 用，走 ChatMemoryConfig Bean）
+# DeepSeek V4 Flash 上下文已足够容纳 100 条历史消息
 # 想省 Token → 调到 50；想更长记忆 → 调到 200
 chat-memory:
   max-recent-messages: 100
+
+# 恋爱顾问（知心）对话记忆条数：独立于 manus，走 LoveAdvisorService 自己 new 的 FileBasedChatMemory
+# 恋爱主回答每次把最近 N 条原文塞进 Prompt，是大头 token → 窗口收窄到 30 省 60%+，长期记忆靠 PgVector 补
+love:
+  chat-memory:
+    max-recent-messages: 30
 
 #search:
 #  api:

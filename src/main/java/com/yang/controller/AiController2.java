@@ -43,7 +43,7 @@ public class AiController2 {
     private ToolCallback[] allTools;
     @Resource
     @Qualifier("openAiChatModel")
-    private ChatModel deepseekChatModel;        // DeepSeek V4 Pro（Agent 推理）
+    private ChatModel deepseekChatModel;        // DeepSeek V4 Flash（Agent 推理）
     @Resource
     private ChatMemory chatMemory;
     @Resource
