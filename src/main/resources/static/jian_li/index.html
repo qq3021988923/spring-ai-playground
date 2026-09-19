@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<title>梁曼妮 · Java 后端开发 - 在线简历</title>
+<style>
+  :root{
+    --bg0:#070312;
+    --bg1:#0d0620;
+    --card:rgba(255,255,255,.045);
+    --line:rgba(148,163,255,.14);
+    --txt:#e7e9ff;
+    --dim:#9aa3cf;
+    --c1:#7c5cff;
+    --c2:#22d3ee;
+    --c3:#ff7ac6;
+    --grad:linear-gradient(120deg,#7c5cff,#22d3ee 55%,#ff7ac6);
+  }
+  *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html{scroll-behavior:smooth}
+  body{
+    min-height:100vh;
+    color:var(--txt);
+    font-family:"PingFang SC","Microsoft YaHei","Segoe UI",system-ui,-apple-system,sans-serif;
+    background:
+      radial-gradient(900px 420px at 85% -5%,rgba(124,92,255,.35),transparent 60%),
+      radial-gradient(700px 380px at -10% 15%,rgba(34,211,238,.22),transparent 60%),
+      linear-gradient(180deg,var(--bg1),var(--bg0) 45%,#0a0616);
+    overflow-x:hidden;
+    padding:max(14px,env(safe-area-inset-top)) 14px 60px;
+  }
+  /* 星星粒子背景 */
+  .stars{position:fixed;inset:0;z-index:-2;pointer-events:none}
+  .stars i{position:absolute;border-radius:50%;background:#fff;opacity:0;animation:tw 6s infinite}
+  @keyframes tw{0%{opacity:0}15%{opacity:.9}40%{opacity:.2}70%{opacity:.7}100%{opacity:0}}
+
+  .wrap{max-width:980px;margin:0 auto}
+  .grad-text{
+    background:var(--grad);
+    -webkit-background-clip:text;background-clip:text;color:transparent;
+  }
+
+  /* ============ 顶部个人卡片 ============ */
+  .hero{
+    position:relative;
+    display:flex;gap:22px;align-items:flex-start;justify-content:space-between;
+    background:linear-gradient(135deg,rgba(124,92,255,.16),rgba(34,211,238,.07) 60%,rgba(255,122,198,.10));
+    border:1px solid var(--line);
+    border-radius:22px;
+    padding:clamp(20px,4vw,34px);
+    box-shadow:0 22px 60px rgba(0,0,0,.5),inset 0 1px 0 rgba(255,255,255,.06);
+    backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);
+    overflow:hidden;
+  }
+  .hero::before{content:"";position:absolute;inset:0;pointer-events:none;
+    background:linear-gradient(115deg,transparent 40%,rgba(255,255,255,.05),transparent 65%);}
+  .hero .me{flex:1;min-width:0;position:relative;z-index:1}
+  .badge-job{
+    display:inline-flex;align-items:center;gap:8px;
+    font-size:clamp(11px,2.6vw,13px);color:#cdd3ff;
+    background:rgba(124,92,255,.16);border:1px solid rgba(124,92,255,.4);
+    padding:5px 12px;border-radius:999px;margin-bottom:12px;letter-spacing:.3px;
+  }
+  .badge-job .dot{width:7px;height:7px;border-radius:50%;background:var(--c2);
+    box-shadow:0 0 10px var(--c2);animation:pulse 1.6s infinite}
+  @keyframes pulse{50%{opacity:.35}}
+  .hero h1{
+    font-size:clamp(30px,8vw,52px);font-weight:900;line-height:1.12;
+    text-shadow:0 0 34px rgba(124,92,255,.45);
+  }
+  .hero .slogan{margin-top:10px;font-size:clamp(14px,3.6vw,18px);color:var(--dim);line-height:1.7}
+  .contact{display:flex;flex-wrap:wrap;gap:9px;margin-top:16px}
+  .chip{
+    display:inline-flex;align-items:center;gap:6px;
+    font-size:clamp(12px,3vw,13.5px);color:var(--txt);
+    background:rgba(255,255,255,.05);border:1px solid var(--line);
+    padding:7px 12px;border-radius:12px;text-decoration:none;
+  }
+  .chip b{color:#fff;font-weight:600}
+  .chip svg{width:14px;height:14px;stroke:var(--c2);fill:none;stroke-width:2}
+  .avatar{position:relative;flex-shrink:0;z-index:1}
+  .avatar img{
+    width:clamp(92px,24vw,168px);height:clamp(92px,24vw,168px);
+    object-fit:cover;border-radius:50%;
+    border:3px solid rgba(255,255,255,.28);
+    box-shadow:0 0 0 6px rgba(124,92,255,.18),0 14px 40px rgba(124,92,255,.4);
+    animation:spin 9s linear infinite;
+  }
+  @keyframes spin{
+    0%{box-shadow:0 0 0 4px rgba(34,211,238,.45),0 0 30px rgba(34,211,238,.5),0 0 0 10px rgba(124,92,255,.12)}
+    33%{box-shadow:0 0 0 4px rgba(255,122,198,.45),0 0 30px rgba(255,122,198,.5),0 0 0 10px rgba(124,92,255,.12)}
+    66%{box-shadow:0 0 0 4px rgba(124,92,255,.55),0 0 34px rgba(124,92,255,.6),0 0 0 10px rgba(34,211,238,.12)}
+    100%{box-shadow:0 0 0 4px rgba(34,211,238,.45),0 0 30px rgba(34,211,238,.5),0 0 0 10px rgba(124,92,255,.12)}
+  }
+
+  /* ============ 版块 ============ */
+  section{margin-top:26px}
+  .card{
+    background:var(--card);
+    border:1px solid var(--line);
+    border-radius:20px;
+    padding:clamp(18px,4vw,28px);
+    box-shadow:0 18px 50px rgba(0,0,0,.35);
+    backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);
+  }
+  .sec-h{
+    display:flex;align-items:center;gap:12px;
+    font-size:clamp(19px,5vw,24px);font-weight:800;margin-bottom:18px;
+  }
+  .sec-h .num{
+    width:38px;height:38px;flex-shrink:0;display:grid;place-items:center;
+    font-size:16px;font-weight:900;color:#0b0620;border-radius:11px;background:var(--grad);
+  }
+  .sec-h::after{content:"";flex:1;height:1px;background:linear-gradient(90deg,var(--line),transparent)}
+
+  .time{font-size:clamp(11.5px,3vw,13px);color:var(--c2);font-weight:600;white-space:nowrap}
+  .item-title{display:flex;flex-wrap:wrap;align-items:center;gap:6px 14px}
+  .item-title h3{font-size:clamp(16px,4.2vw,19px);color:#fff}
+  .item-title .role{
+    font-size:clamp(11.5px,3vw,13px);color:#ffd36b;
+    background:rgba(255,180,60,.12);border:1px solid rgba(255,200,100,.35);
+    padding:2px 10px;border-radius:999px;
+  }
+  .edu-row{display:flex;flex-wrap:wrap;align-items:baseline;gap:6px 16px}
+  .edu-row .school{font-size:clamp(16px,4.2vw,19px);font-weight:700;color:#fff}
+  .edu-row .degree{color:var(--c3);font-size:clamp(12.5px,3.4vw,14px)}
+  .award{margin-top:10px;padding:10px 14px;border-radius:12px;
+    background:rgba(34,211,238,.08);border:1px dashed rgba(34,211,238,.4);color:var(--txt);
+    font-size:clamp(12.5px,3.3vw,14.5px);line-height:1.8}
+  .award b{color:var(--c2)}
+
+  .tags{display:flex;flex-wrap:wrap;gap:7px;margin:10px 0 12px}
+  .tag{
+    font-size:clamp(11px,2.8vw,12.5px);color:#d6d9ff;
+    background:rgba(124,92,255,.13);border:1px solid rgba(124,92,255,.35);
+    padding:4px 10px;border-radius:999px;
+  }
+  .tag:hover{background:rgba(124,92,255,.3);transform:translateY(-1px)}
+  .desc{color:var(--txt);font-size:clamp(13px,3.4vw,15px);line-height:1.85;margin-bottom:8px}
+  .desc small{color:var(--dim)}
+  ul.pts{list-style:none}
+  ul.pts li{
+    position:relative;padding:5px 0 5px 26px;color:#dfe3ff;
+    font-size:clamp(13px,3.4vw,15px);line-height:1.85;
+  }
+  ul.pts li::before{
+    content:"";position:absolute;left:4px;top:16px;width:9px;height:9px;
+    background:var(--grad);border-radius:50%;
+    box-shadow:0 0 12px rgba(124,92,255,.9);
+  }
+  ul.pts li b{color:#fff}
+  .hr{height:1px;background:linear-gradient(90deg,transparent,var(--line),transparent);margin:18px 0}
+
+  /* 技能列表 */
+  .skills{display:grid;gap:10px}
+  .sk{display:flex;align-items:flex-start;gap:12px;padding:10px 12px;border-radius:12px;
+    background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.05)}
+  .sk .ico{flex-shrink:0;width:26px;height:26px;display:grid;place-items:center;border-radius:8px;
+    background:linear-gradient(135deg,rgba(124,92,255,.35),rgba(34,211,238,.3));font-size:14px}
+  .sk p{font-size:clamp(13px,3.4vw,15px);line-height:1.8;color:#e2e5ff}
+  .sk b{color:#fff}
+
+  .intro p{font-size:clamp(13.5px,3.6vw,15.5px);line-height:2;color:#e4e7ff}
+
+  .foot{text-align:center;color:var(--dim);font-size:12px;margin-top:34px;opacity:.75}
+  .link-github{
+    display:inline-flex;align-items:center;gap:8px;margin:2px 0 14px;
+    color:#8de9ff;text-decoration:none;font-size:clamp(12.5px,3.3vw,14px);
+    border:1px solid rgba(34,211,238,.35);background:rgba(34,211,238,.08);
+    padding:7px 14px;border-radius:999px;
+  }
+  .link-github:hover{background:rgba(34,211,238,.2)}
+
+  /* ============ 打字光标 ============ */
+  .tw{position:relative}
+  .caret::after{
+    content:"▍";color:var(--c2);margin-left:1px;
+    animation:blink .8s steps(1) infinite;
+  }
+  @keyframes blink{50%{opacity:0}}
+
+  /* 打字时按钮 */
+  .skip{
+    position:fixed;right:14px;bottom:16px;z-index:60;
+    display:none;align-items:center;gap:6px;
+    font-size:13px;color:#fff;background:rgba(124,92,255,.85);
+    border:1px solid rgba(255,255,255,.3);padding:9px 15px;border-radius:999px;
+    box-shadow:0 8px 24px rgba(0,0,0,.45);cursor:pointer;backdrop-filter:blur(8px);
+  }
+  .skip.show{display:inline-flex}
+  .skip:hover{background:rgba(124,92,255,1)}
+
+  @media (max-width:560px){
+    .hero{flex-direction:column;align-items:stretch}
+    .avatar{position:absolute;top:14px;right:14px}
+    .avatar img{width:76px;height:76px}
+    .hero{padding-top:30px}
+  }
+</style>
+</head>
+<body>
+
+<!-- 星空背景 -->
+<div class="stars" id="stars"></div>
+
+<!-- 跳过按钮 -->
+<button class="skip" id="skipBtn">⚡ 跳过打字动画</button>
+
+<div class="wrap">
+
+  <!-- ==================== 顶部卡片 ==================== -->
+  <header class="hero">
+    <div class="me">
+      <span class="badge-job"><span class="dot"></span>求职意向：Java后端开发（具备 AI Agent 全栈开发经验）</span>
+      <h1 class="tw grad-text">梁曼妮</h1>
+      <p class="slogan tw">用代码驱动业务，用 AI 重塑效率 · Java 后端 / Spring AI Agent 开发者</p>
+      <div class="contact">
+        <span class="chip tw"><svg viewBox="0 0 24 24"><path d="M4 4h16v13H7l-3 3z"/></svg>联系方式：<b>18776423429</b></span>
+        <span class="chip tw"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></svg>邮箱：<b>3021988923@qq.com</b></span>
+      </div>
+    </div>
+    <div class="avatar"><img src="../images/man.jpg" alt="梁曼妮照片" /></div>
+  </header>
+
+  <!-- ==================== 教育背景 ==================== -->
+  <section>
+    <div class="card">
+      <h2 class="sec-h"><span class="num">01</span>教育背景</h2>
+      <div class="edu-row">
+        <span class="time tw">2022.09 ~ 2026.06</span>
+        <span class="school tw">桂林电子科技大学</span>
+        <span class="degree tw">网络工程 | 本科</span>
+      </div>
+      <div class="award tw">⚫ 专业排名前 10%，荣获<b>一等奖学金</b>、<b>国家励志奖学金</b>、<b>2025年3月广西应用软件系统开发（团队赛）一等奖</b></div>
+    </div>
+  </section>
+
+  <!-- ==================== 工作经历 ==================== -->
+  <section>
+    <div class="card">
+      <h2 class="sec-h"><span class="num">02</span>工作经历</h2>
+
+      <div class="item-title">
+        <h3 class="tw">深圳小杨科技有限公司（广东深圳）</h3>
+        <span class="role tw">后端开发</span>
+        <span class="time tw">2026.05 ~ 2026.09</span>
+      </div>
+      <div class="tags">
+        <span class="tag tw">Spring Boot</span><span class="tag tw">MyBatis</span><span class="tag tw">MySQL</span>
+        <span class="tag tw">Redis</span><span class="tag tw">Spring Scheduled</span><span class="tag tw">发票OCR识别</span>
+      </div>
+      <p class="desc tw"><small>项目简介：</small>雅培医疗器械的订单管理系统，服务二级经销商，面向植入、发票验真、授权审批业务。</p>
+      <ul class="pts">
+        <li class="tw">设计二级、三级经销商数据权限模型：三级用户按 id 隔离，一套查询逻辑同时服务两级经销商，接口开发量减少约 <b>50%</b>。</li>
+        <li class="tw">实现采购/非采购双链路库存一致性：采购逐条扣减、非采购走独立台账，冲红/撤销按来源自动回写，人工对账减少约 <b>90%</b>。</li>
+        <li class="tw">基于发票日志 + 定时任务实现三级递进复查与冲红预警：发票OCR识别票种后按"提交时 → 1个月 → 3个月"验真，每张最多 3 次、验真成本下降约 <b>60%</b>，冲红命中自动恢复库存。</li>
+        <li class="tw">维护 8 状态植入流程：撤销、已提交、平台处理中、平台已植入……全程事务一致。</li>
+      </ul>
+
+      <div class="hr"></div>
+
+      <div class="item-title">
+        <h3 class="tw">遵义小红椒网络科技有限公司（贵州）</h3>
+        <span class="role tw">后端开发</span>
+        <span class="time tw">2025.06 ~ 2026.02</span>
+      </div>
+      <div class="tags">
+        <span class="tag tw">Spring Boot 3.2</span><span class="tag tw">MyBatis</span><span class="tag tw">MySQL</span>
+        <span class="tag tw">Redis</span><span class="tag tw">WebSocket</span><span class="tag tw">JWT</span>
+        <span class="tag tw">Scheduled</span><span class="tag tw">RabbitMQ</span>
+      </div>
+      <p class="desc tw"><small>项目名称：</small><b>集时送 · 同城即时零售配送</b></p>
+      <p class="desc tw">参与即时零售配送系统开发，覆盖商品、订单、消息推送等核心模块，以缓存与消息机制解决性能及数据一致性问题，贯通商家后台与 C 端下单全链路。</p>
+      <ul class="pts">
+        <li class="tw">负责商品与套餐管理模块开发，完成商品CRUD、规格配置、套餐组合等功能，开发 <b>12 个 RESTful 接口</b>，实现公共字段自动填充，模块稳定运行，支撑 <b>1000+</b> 商品的日常管理。</li>
+        <li class="tw">主导 Redis 缓存优化落地，采用 Cache-Aside 模式优化商品分类高频查询，将查询响应从 <b>200ms 优化至 25ms</b> 左右，降低数据库压力，为 C 端并发查询场景提供性能保障。</li>
+        <li class="tw">实现推送功能，替代传统 HTTP 轮询方案，商家端可毫秒级接收新订单通知，显著提升接单响应速度。</li>
+        <li class="tw">基于延迟消息实现超时自动取消，手动 ACK + 消息持久化保障消息可靠性，失败自动重试机制。</li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- ==================== 项目经历 ==================== -->
+  <section>
+    <div class="card">
+      <h2 class="sec-h"><span class="num">03</span>项目经历</h2>
+
+      <div class="item-title">
+        <h3 class="tw">多模型协作恋爱智能体</h3>
+        <span class="time tw">2025.03 ~ 2025.06</span>
+      </div>
+      <div class="tags">
+        <span class="tag tw">Spring Boot</span><span class="tag tw">Spring AI</span>
+        <span class="tag tw">DeepSeek V4 Pro / Flash</span><span class="tag tw">qwen-plus</span>
+        <span class="tag tw">PgVector</span><span class="tag tw">SSE</span><span class="tag tw">Docker</span>
+      </div>
+      <p class="desc tw"><small>项目简介：</small>基于 Spring AI 独立开发的多模型协作 Agent 平台，支持 ReAct 工具调用、RAG 检索、流式对话与长期记忆，已容器化部署上线。</p>
+      <ul class="pts">
+        <li class="tw">设计多模型分层架构：核心推理与工具调用走 Pro，改写、扩展、关键词等辅助任务下沉 Flash，整体推理成本降低约 <b>60%</b>。</li>
+        <li class="tw">实现 Multi-Query RAG 检索：单问题扩展为 2 个变体并行查 PgVector、按文档 ID 去重合并，候选文档量翻倍（topK3→6），内置四层容错。</li>
+        <li class="tw">基于 Kryo 持久化 + 内存缓存实现长期对话记忆，每用户独立存储、重启不丢，滑动窗口截取最近 100 条，仅占 1M 上下文约 <b>2.5%</b>。</li>
+        <li class="tw">支持 SSE 流式输出与 JSON 结构化报告，异步生成中文关键词写入 1024 维向量库，提升中文检索效果。</li>
+      </ul>
+
+      <div class="hr"></div>
+
+      <a class="link-github tw" href="https://github.com/qq3021988923/2026-/tree/master" target="_blank" rel="noopener">🔗 https://github.com/qq3021988923/2026-/tree/master</a>
+
+      <div class="item-title">
+        <h3 class="tw">羊城货运客户管理系统</h3>
+        <span class="time tw">2024.12 ~ 2025.03</span>
+      </div>
+      <div class="tags">
+        <span class="tag tw">Spring Cloud Alibaba</span><span class="tag tw">Nacos</span><span class="tag tw">OpenFeign</span>
+        <span class="tag tw">MyBatis</span><span class="tag tw">MySQL</span><span class="tag tw">DeepSeek API</span><span class="tag tw">JWT</span>
+      </div>
+      <p class="desc tw"><small>项目背景：</small>针对中小型物流企业信息化痛点，打造轻量化、低成本的微服务物流管理平台。</p>
+      <ul class="pts">
+        <li class="tw">设计并实现基于微服务架构的货运客户管理系统，系统拆分为网关、消费者、提供者三个独立微服务，实现模块解耦与独立部署。</li>
+        <li class="tw">实现 <b>10 个核心功能模块</b>，覆盖客户管理、订单管理、物流追踪、财务管理等全业务流程。</li>
+        <li class="tw">开发 Excel 批量导出，FastExcel 库优化，1000 条数据导出时间 ≤ 1.8 秒，订单处理效率提升约 <b>40%</b>。</li>
+        <li class="tw">集成 DeepSeek 大模型 AI 智能客服：通过 RAG 思想预处理订单信息后调用 API，实现自然语言订单查询与业务咨询，用户咨询响应效率提升约 <b>60%</b>，支持并发 10 人同时询问。</li>
+        <li class="tw">基于 RBAC + JWT 实现用户-角色-权限三级管控，密码 BCrypt 加密。通过切面自动记录操作日志，支持审计追溯。</li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- ==================== 专业技能 ==================== -->
+  <section>
+    <div class="card">
+      <h2 class="sec-h"><span class="num">04</span>专业技能</h2>
+      <div class="skills">
+        <div class="sk"><span class="ico">☕</span><p class="tw"><b>Java 基础：</b>掌握 Java 基础，熟悉集合、多线程、IO、反射核心特性，了解线程池、ThreadLocal 应用场景。</p></div>
+        <div class="sk"><span class="ico">🗄️</span><p class="tw"><b>数据库：</b>熟悉 MySQL 及 SQL 编写，了解索引、事务、锁机制与 MVCC，具备优化思路。</p></div>
+        <div class="sk"><span class="ico">🧩</span><p class="tw"><b>JavaWeb：</b>熟悉 JavaWeb 技术栈，掌握 Spring、SpringMVC、MyBatis 框架，理解 IOC、AOP 核心设计思想。</p></div>
+        <div class="sk"><span class="ico">🚀</span><p class="tw"><b>微服务：</b>熟悉 SpringBoot 及 SpringCloudAlibaba，能使用 Nacos、OpenFeign、Gateway 等核心组件。</p></div>
+        <div class="sk"><span class="ico">🐰</span><p class="tw"><b>消息队列：</b>了解 RabbitMQ，熟悉延迟消息、死信队列在订单超时等场景的应用。</p></div>
+        <div class="sk"><span class="ico">🤖</span><p class="tw"><b>AI Agent 开发：</b>熟练使用 Spring AI、LangChain4j，掌握 ReAct Agent 编排、Function Calling 工具调用、Multi-Query RAG 检索、多模型分层调度与 Prompt 工程。</p></div>
+        <div class="sk"><span class="ico">🛠️</span><p class="tw"><b>AI 编程工具：</b>熟练使用 Cursor、Trae、Kiro 等 AI 编程工具，辅助代码开发、调试与文档编写，提升工作效率。</p></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ==================== 个人简介 ==================== -->
+  <section>
+    <div class="card intro">
+      <h2 class="sec-h"><span class="num">05</span>个人简介</h2>
+      <p class="tw">1 年 Java 后端开发经验，参与即时零售配送、医疗器械订单、微服务物流等系统开发，覆盖商品、订单、库存、发票验真等核心模块。熟悉 Spring Boot、Spring Cloud Alibaba、MySQL、Redis、RabbitMQ，具备缓存优化（查询响应 200ms → 25ms）、数据一致性及可靠消息实战经验。擅长 AI Agent 开发，基于 Spring AI 独立完成多模型分层调度、ReAct 工具调用与 RAG 检索，推理成本降低约 60%。熟练使用 Cursor、Trae 等 AI 编程工具，注重代码质量与交付效率。</p>
+    </div>
+  </section>
+
+  <div class="foot">· 梁曼妮 · Java 后端开发 · 18776423429 · 3021988923@qq.com ·</div>
+</div>
+
+<script>
+/* ===== 星空 ===== */
+(function(){
+  const wrap=document.getElementById('stars');
+  const n=Math.min(70,innerWidth/14);
+  for(let i=0;i<n;i++){
+    const s=document.createElement('i');
+    const size=(Math.random()*2.2+.6).toFixed(1);
+    s.style.cssText=`left:${Math.random()*100}%;top:${Math.random()*100}%;`+
+      `width:${size}px;height:${size}px;animation-delay:${(Math.random()*6).toFixed(1)}s;`+
+      `animation-duration:${(Math.random()*4+4).toFixed(1)}s;`;
+    wrap.appendChild(s);
+  }
+})();
+
+/* ===== 打字动画：按行从上往下逐字显示 ===== */
+(function(){
+  const els=[...document.querySelectorAll('.tw')];
+  const skipBtn=document.getElementById('skipBtn');
+  let busy=true, stop=false, timer=null;
+  skipBtn.classList.add('show');
+
+  function finishAll(){
+    stop=true; busy=false;
+    if(timer){clearInterval(timer);timer=null}
+    els.forEach(el=>{
+      el.classList.remove('caret');
+      if(el.dataset.txt!==undefined) el.textContent=el.dataset.txt;
+    });
+    skipBtn.classList.remove('show');
+  }
+
+  function typeLine(el){
+    return new Promise(done=>{
+      const full=el.dataset.txt;
+      let i=0;
+      el.classList.add('caret');
+      el.scrollIntoView({block:'nearest',behavior:'smooth'});
+      timer=setInterval(()=>{
+        if(stop){el.textContent=full;el.classList.remove('caret');done();return}
+        i+=3;                       // 一次打 3 个字，速度刚好
+        el.textContent=full.slice(0,i);
+        if(i>=full.length){
+          clearInterval(timer);timer=null;
+          el.classList.remove('caret');
+          done();
+        }
+      },16);
+    });
+  }
+
+  (async function run(){
+    await new Promise(r=>setTimeout(r,350));      // 开场小停顿
+    if(stop) return;                              // 停顿期间已被跳过则不再清空文字
+    for(const el of els){
+      el.dataset.txt=el.textContent;              // 先缓存原文
+      el.textContent='';
+    }
+    for(const el of els){
+      if(stop) break;
+      await typeLine(el);
+      await new Promise(r=>setTimeout(r,110));    // 行与行间隔
+    }
+    busy=false;
+    skipBtn.classList.remove('show');
+  })();
+
+  skipBtn.addEventListener('click',finishAll);
+  // 点页面任意处也能跳过
+  document.addEventListener('click',()=>{ if(busy&&!stop) finishAll(); },{once:true});
+})();
+</script>
+</body>
+</html>
